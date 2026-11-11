@@ -1,17 +1,23 @@
+import { zValidator } from "@hono/zod-validator";
 import { createFactory } from "hono/factory";
-import type { SkillsEnv } from "@/server/api/protected/skills/context";
-import { okDownload, versionedSkillParams } from "@/server/api/protected/skills/context";
-import { failure } from "@/server/lib/http";
-import { notFound } from "@/server/lib/result";
-import { skillNameSchema } from "@/shared/schemas/skills";
+import { notFoundOnInvalid, type SkillsEnv } from "@/server/api/protected/skills/context";
+import { failure, stream } from "@/server/lib/http";
+import { skillVersionParamsSchema } from "@/shared/schemas/skills/request/skill";
 
 const factory = createFactory<SkillsEnv>();
 
-export const index = factory.createHandlers(async (c) => {
-  const params = versionedSkillParams(c.req.path);
-  if (params === null || !skillNameSchema.safeParse(params.name).success)
-    return failure(c, notFound("スキルの版が見つかりません"));
+export const index = factory.createHandlers(
+  zValidator("param", skillVersionParamsSchema, notFoundOnInvalid),
+  async (c) => {
+    const { skillName, version } = c.req.valid("param");
 
-  const result = await c.get("skillService").download(params.name, params.version);
-  return result.ok ? okDownload(c, result.value) : failure(c, result);
-});
+    const result = await c.get("skillService").download(skillName, version);
+    return result.ok
+      ? stream(c, result.value.body, {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="${result.value.filename}"`,
+          "Content-Length": String(result.value.size)
+        })
+      : failure(c, result);
+  }
+);

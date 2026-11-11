@@ -96,4 +96,22 @@ describe("SkillVersionRepository", () => {
 
     expect(await repository.listBySkillIds([])).toEqual({ ok: true, value: [] });
   });
+
+  test("100 件を超える skill_id でも分けて引き、全部返す", async () => {
+    const { db, repository } = setup();
+    const skillIds: string[] = [];
+    for (let index = 0; index < 120; index++) {
+      const skillId = `skill-${index}`;
+      skillIds.push(skillId);
+      await insertSkill(db, skillId, `skill-${index}`);
+      await insertVersion(db, skillId, 1);
+    }
+
+    const result = await repository.listBySkillIds(skillIds);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toHaveLength(120);
+    expect(new Set(result.value.map((version) => version.skillId)).size).toBe(120);
+  });
 });

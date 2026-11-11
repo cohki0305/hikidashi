@@ -22,15 +22,22 @@ export type SkillServiceDeps = {
   claudeAiMaxBytes?: number;
 };
 
-async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+async function readAll(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number
+): Promise<Uint8Array | null> {
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
     total += value.length;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
   }
   const out = new Uint8Array(total);
   let offset = 0;
@@ -142,12 +149,16 @@ export class SkillService {
     );
     if (entry === undefined || entry.path !== path || entry.isSymlink)
       return notFound("プレビューできるファイルではありません");
+    // DB の size_bytes と zip の実体がずれていても、展開後の大きさで弾く（zip bomb 対策）。
+    if (entry.uncompressedSize > PREVIEW_MAX_BYTES)
+      return notFound("プレビューできるファイルではありません");
 
     const opened = await openEntryStream(sourceResult.value, entry);
     if (!opened.ok) return opened;
 
     try {
-      const bytes = await readAll(opened.value);
+      const bytes = await readAll(opened.value, PREVIEW_MAX_BYTES);
+      if (bytes === null) return notFound("プレビューできるファイルではありません");
       return ok(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
     } catch {
       return upstream("ファイルの中身を読めませんでした");

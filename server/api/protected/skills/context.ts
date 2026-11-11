@@ -26,6 +26,12 @@ export function provideSkillService(service?: SkillServicePort) {
   });
 }
 
+/** zValidator の検証失敗を 404 に写す（存在しない資源として扱う）。 */
+export function notFoundOnInvalid(result: { success: boolean }, c: Context) {
+  if (result.success) return;
+  return failure(c, notFound("入力が正しくありません"));
+}
+
 /** パスを `/` で分けたセグメント（空は除く）。名前と版は英数字とハイフンだけなので戻さない。 */
 export function pathSegments(pathname: string): string[] {
   return pathname.split("/").filter((segment) => segment !== "");
@@ -51,21 +57,4 @@ export function versionedSkillParams(pathname: string): { name: string; version:
 export function isSafePreviewPath(path: string): boolean {
   if (path.length === 0 || path.startsWith("/") || path.includes("\\")) return false;
   return path.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
-}
-
-/** プレビューのテキスト応答。 */
-export function okText(c: Context<SkillsEnv>, body: string) {
-  return c.body(body, 200, { "Content-Type": "text/plain; charset=utf-8" });
-}
-
-/** zip を Worker のメモリに載せずにそのまま流す応答。 */
-export function okDownload(
-  c: Context<SkillsEnv>,
-  file: { body: ReadableStream; size: number; filename: string }
-) {
-  return c.body(file.body, 200, {
-    "Content-Type": "application/zip",
-    "Content-Disposition": `attachment; filename="${file.filename}"`,
-    "Content-Length": String(file.size)
-  });
 }

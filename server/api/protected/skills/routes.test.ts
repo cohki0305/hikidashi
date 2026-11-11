@@ -13,18 +13,18 @@ describe("skillRoutes", () => {
     }));
 
     expect(routes).toEqual([
-      { method: "GET", path: "/skills", handler: skills.index[0] },
-      { method: "GET", path: "/skills/:skillName", handler: skills.show[0] },
-      {
+      ...skills.index.map((handler) => ({ method: "GET", path: "/skills", handler })),
+      ...skills.show.map((handler) => ({ method: "GET", path: "/skills/:skillName", handler })),
+      ...skillVersionFiles.index.map((handler) => ({
         method: "GET",
         path: "/skills/:skillName/versions/:version/files",
-        handler: skillVersionFiles.index[0]
-      },
-      {
+        handler
+      })),
+      ...skillVersionDownloads.index.map((handler) => ({
         method: "GET",
         path: "/skills/:skillName/versions/:version/download",
-        handler: skillVersionDownloads.index[0]
-      }
+        handler
+      }))
     ]);
   });
 });

@@ -2,9 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { SkillFileRepository } from "@/server/repositories/skill-file-repository";
 import { SkillRepository } from "@/server/repositories/skill-repository";
 import { SkillVersionRepository } from "@/server/repositories/skill-version-repository";
+import { makeZip } from "@/tests/helpers/make-zip";
 import { createFakeR2Bucket, seedSkill } from "@/tests/helpers/seed-skill";
 import { createTestDb, type TestDb } from "@/tests/helpers/test-db";
-import { SkillService } from "./index";
+import { PREVIEW_MAX_BYTES, SkillService } from "./index";
 
 const openDbs: TestDb[] = [];
 
@@ -31,6 +32,31 @@ const TEXT_FILES = {
   "assets/logo.bin": new Uint8Array([0, 1, 2, 3, 254, 255]),
   "scripts/run.md": "手順を書いたファイル\n"
 };
+
+/** 中央ディレクトリの uncompressed size だけを書き換える（DB と zip のずれを作る）。 */
+function patchUncompressedSize(zip: Uint8Array, path: string, size: number): Uint8Array {
+  const out = zip.slice();
+  const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
+  const eocd = out.length - 22;
+  if (view.getUint32(eocd, true) !== 0x06054b50) throw new Error("EOCD がありません");
+  const entryCount = view.getUint16(eocd + 10, true);
+  let offset = view.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder();
+  for (let index = 0; index < entryCount; index++) {
+    if (view.getUint32(offset, true) !== 0x02014b50)
+      throw new Error("中央ディレクトリの署名が不正です");
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const name = decoder.decode(out.subarray(offset + 46, offset + 46 + nameLength));
+    if (name === path) {
+      view.setUint32(offset + 24, size, true);
+      return out;
+    }
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  throw new Error(`エントリがありません: ${path}`);
+}
 
 describe("SkillService.list", () => {
   afterEach(() => {
@@ -199,6 +225,39 @@ describe("SkillService.preview", () => {
       kind: "not_found"
     });
     expect(await service.preview("alpha", 1, "missing.md")).toMatchObject({
+      ok: false,
+      kind: "not_found"
+    });
+  });
+
+  test("zip の展開後サイズが 256KB を超えるなら notFound（DB とずれていても弾く）", async () => {
+    const { testDb, fake, service } = setup();
+    const { skillId } = await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: { "SKILL.md": "a" }
+    });
+    const key = `versions/${skillId}/1.zip`;
+    fake.objects.set(key, makeZip([{ path: "SKILL.md", data: "a".repeat(PREVIEW_MAX_BYTES + 1) }]));
+
+    expect(await service.preview("alpha", 1, "SKILL.md")).toMatchObject({
+      ok: false,
+      kind: "not_found"
+    });
+  });
+
+  test("zip の申告より実際の展開が大きいときも 256KB で打ち切って notFound", async () => {
+    const { testDb, fake, service } = setup();
+    const { skillId } = await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: { "SKILL.md": "a" }
+    });
+    const key = `versions/${skillId}/1.zip`;
+    const huge = makeZip([{ path: "SKILL.md", data: "a".repeat(PREVIEW_MAX_BYTES + 1) }]);
+    fake.objects.set(key, patchUncompressedSize(huge, "SKILL.md", 10));
+
+    expect(await service.preview("alpha", 1, "SKILL.md")).toMatchObject({
       ok: false,
       kind: "not_found"
     });

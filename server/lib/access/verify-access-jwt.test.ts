@@ -14,15 +14,23 @@ async function setup() {
   const verify = createAccessVerifier({ teamDomain: TEAM_DOMAIN, audience: AUDIENCE, keySet });
   const sign = (
     claims: Record<string, unknown>,
-    options: { issuer?: string; audience?: string; kid?: string } = {}
-  ) =>
-    new SignJWT(claims)
+    options: {
+      issuer?: string;
+      audience?: string;
+      kid?: string;
+      expirationTime?: string | number;
+      notBefore?: string | number;
+    } = {}
+  ) => {
+    let jwt = new SignJWT(claims)
       .setProtectedHeader({ alg: "RS256", kid: options.kid ?? "test-key" })
       .setIssuer(options.issuer ?? TEAM_DOMAIN)
       .setAudience(options.audience ?? AUDIENCE)
       .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
+      .setExpirationTime(options.expirationTime ?? "5m");
+    if (options.notBefore !== undefined) jwt = jwt.setNotBefore(options.notBefore);
+    return jwt.sign(privateKey);
+  };
   return { verify, sign };
 }
 
@@ -64,6 +72,28 @@ describe("createAccessVerifier", () => {
       .setExpirationTime("5m")
       .sign(other.privateKey);
     const result = await verify(jwt);
+    expect(result.ok).toBe(false);
+  });
+
+  it("期限切れの JWT は通さない", async () => {
+    const { verify, sign } = await setup();
+    const result = await verify(
+      await sign(
+        { email: "member@example.com" },
+        { expirationTime: Math.floor(Date.now() / 1000) - 60 }
+      )
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("有効開始前（nbf が未来）の JWT は通さない", async () => {
+    const { verify, sign } = await setup();
+    const result = await verify(
+      await sign(
+        { email: "member@example.com" },
+        { notBefore: Math.floor(Date.now() / 1000) + 3600 }
+      )
+    );
     expect(result.ok).toBe(false);
   });
 

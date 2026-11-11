@@ -26,10 +26,8 @@ export function createApp(deps: AppDeps) {
       return c.json({ error: "Internal server error" }, 500);
     })
     .route("/api", healthRoutes)
-    // 保護する入口だけに本人確認を張る。知らない道は認証の前に 404 にする
-    .use("/api/skills", verifyAccess)
-    .use("/api/skills/*", verifyAccess)
-    .use("/api/me", verifyAccess)
+    // 健康確認の後に一括で本人確認を張る。新しく足す /api の道も自動で保護される（fail closed）
+    .use("/api/*", verifyAccess)
     .route("/api", createSkillRoutes(deps.skillService))
     .route("/api", meRoutes);
   return app.notFound((c) => failure(c, notFound("Not found")));
