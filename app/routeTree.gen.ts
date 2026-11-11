@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthorizeRouteImport } from './routes/authorize'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as SkillsNameRouteImport } from './routes/skills.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthorizeRoute = AuthorizeRouteImport.update({
+  id: '/authorize',
+  path: '/authorize',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectRoute = ConnectRouteImport.update({
@@ -31,30 +37,34 @@ const SkillsNameRoute = SkillsNameRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connect' | '/skills/$name'
+  fullPaths: '/' | '/authorize' | '/connect' | '/skills/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connect' | '/skills/$name'
-  id: '__root__' | '/' | '/connect' | '/skills/$name'
+  to: '/' | '/authorize' | '/connect' | '/skills/$name'
+  id: '__root__' | '/' | '/authorize' | '/connect' | '/skills/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthorizeRoute: typeof AuthorizeRoute
   ConnectRoute: typeof ConnectRoute
   SkillsNameRoute: typeof SkillsNameRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/authorize': {
+      id: '/authorize'
+      path: '/authorize'
+      fullPath: '/authorize'
+      preLoaderRoute: typeof AuthorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connect': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthorizeRoute: AuthorizeRoute,
   ConnectRoute: ConnectRoute,
   SkillsNameRoute: SkillsNameRoute,
 }

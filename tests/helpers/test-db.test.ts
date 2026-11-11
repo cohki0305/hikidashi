@@ -33,14 +33,24 @@ describe("createTestDb", () => {
     while (openDbs.length > 0) openDbs.pop()?.close();
   });
 
-  test("マイグレーションを流すと 4 つのテーブルがある", () => {
+  test("マイグレーションを流すと 9 つのテーブルがある", () => {
     const { sqlite } = setup();
     const tables = sqlite
       .query("select name from sqlite_master where type = 'table' and name not like 'sqlite_%'")
       .all()
       .map((row) => (row as { name: string }).name)
       .sort();
-    expect(tables).toEqual(["skill_files", "skill_versions", "skills", "uploads"]);
+    expect(tables).toEqual([
+      "oauth_access_tokens",
+      "oauth_clients",
+      "oauth_grants",
+      "oauth_requests",
+      "oauth_used_refresh_tokens",
+      "skill_files",
+      "skill_versions",
+      "skills",
+      "uploads"
+    ]);
   });
 
   test("skills.name は重複できない", () => {

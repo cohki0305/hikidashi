@@ -6,7 +6,9 @@
   // Cloudflare Access の JWT 検証に使う。値は本番の Access アプリに合わせて差し替える。
   "vars": {
     "ACCESS_TEAM_DOMAIN": "https://hikidashi.cloudflareaccess.com",
-    "ACCESS_AUD": "<あとで設定する>"
+    "ACCESS_AUD": "<あとで設定する>",
+    // OAuth と MCP の入口が名乗る自分の URL。未設定ならそれらの入口は載せない（404）。
+    "APP_URL": "<あとで設定する>"
   },
   // D1 はスキルのメタデータ、R2 は版の zip を置く。database_id は本番の D1 を作ったときに差し替える。
   "d1_databases": [

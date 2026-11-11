@@ -1,7 +1,16 @@
+import type { SkillDb } from "@/server/db";
 import { type AccessVerifier, createAccessVerifier } from "@/server/lib/access/verify-access-jwt";
+import { issuerOf } from "@/server/lib/oauth/issuer";
+import { OauthAccessTokenRepository } from "@/server/repositories/oauth-access-token-repository";
+import { OauthClientRepository } from "@/server/repositories/oauth-client-repository";
+import { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
+import { OauthRequestRepository } from "@/server/repositories/oauth-request-repository";
+import { OauthUsedRefreshTokenRepository } from "@/server/repositories/oauth-used-refresh-token-repository";
 import { SkillFileRepository } from "@/server/repositories/skill-file-repository";
 import { createSkillDb, SkillRepository } from "@/server/repositories/skill-repository";
 import { SkillVersionRepository } from "@/server/repositories/skill-version-repository";
+import { McpService } from "@/server/services/mcp-service";
+import { OauthService } from "@/server/services/oauth-service";
 import { SkillService } from "@/server/services/skill-service";
 import { type AppType, createApp } from "./app";
 
@@ -15,6 +24,8 @@ export type BootstrapEnv = {
   APP_ENV?: string;
   DEV_ACCESS_EMAIL?: string;
   CLAUDE_AI_MAX_BYTES?: string;
+  /** hikidashi 自身の URL。OAuth と MCP が名乗る issuer になる。 */
+  APP_URL?: string;
 };
 
 /** Access の JWT 検証器を環境から組み立てる。設定が無ければ undefined。 */
@@ -45,6 +56,43 @@ export function skillServiceFromEnv(env: BootstrapEnv): SkillService | undefined
   });
 }
 
+/** 自分の URL として使える値だけを通す。仮の値や壊れた値なら OAuth と MCP を載せない。 */
+export function appUrlFromEnv(env: BootstrapEnv): string | undefined {
+  const value = env.APP_URL?.trim();
+  if (!value || !URL.canParse(value)) return undefined;
+  const { protocol } = new URL(value);
+  return protocol === "https:" || protocol === "http:" ? value : undefined;
+}
+
+/** DB の束縛から OAuth の service を組み立てる。 */
+export function oauthServiceFromDb(db: SkillDb, appUrl: string): OauthService {
+  return new OauthService({
+    db,
+    clients: new OauthClientRepository(db),
+    requests: new OauthRequestRepository(db),
+    grants: new OauthGrantRepository(db),
+    accessTokens: new OauthAccessTokenRepository(db),
+    usedRefreshTokens: new OauthUsedRefreshTokenRepository(db),
+    issuer: issuerOf(appUrl)
+  });
+}
+
+/** 環境の束縛から OAuth の service を組み立てる。DB か APP_URL が無ければ undefined。 */
+export function oauthServiceFromEnv(env: BootstrapEnv): OauthService | undefined {
+  const appUrl = appUrlFromEnv(env);
+  if (!env.DB || !appUrl) return undefined;
+  return oauthServiceFromDb(createSkillDb(env.DB), appUrl);
+}
+
+/** スキルと OAuth が揃ったときだけ、MCP の service を組み立てる。 */
+export function mcpServiceFromEnv(
+  oauth: OauthService | undefined,
+  skills: SkillService | undefined
+): McpService | undefined {
+  if (!oauth || !skills) return undefined;
+  return new McpService({ oauth, skills });
+}
+
 /** 依存を組み立てて Hono アプリを返す。束縛はリクエストごとに渡る。 */
 export function bootstrap(
   env: BootstrapEnv,
@@ -54,9 +102,14 @@ export function bootstrap(
     console.error(message, context);
   // ASSETS は entry/worker.ts が直接使う。ここではアプリの組み立てだけを行う。
   void env.ASSETS;
+  const skillService = skillServiceFromEnv(env);
+  const oauthService = oauthServiceFromEnv(env);
   return createApp({
     logError,
-    skillService: skillServiceFromEnv(env),
-    accessVerifier: accessVerifierFromEnv(env)
+    skillService,
+    accessVerifier: accessVerifierFromEnv(env),
+    oauth: oauthService,
+    mcp: mcpServiceFromEnv(oauthService, skillService),
+    appUrl: appUrlFromEnv(env)
   });
 }
