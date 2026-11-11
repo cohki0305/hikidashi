@@ -27,8 +27,7 @@ export function AppHeader({ current, email }: AppHeaderProps) {
           height: 64,
           display: "flex",
           alignItems: "center",
-          gap: 32,
-          flexWrap: "wrap"
+          gap: 24
         }}
       >
         <Link
@@ -42,7 +41,7 @@ export function AppHeader({ current, email }: AppHeaderProps) {
         >
           hikidashi
         </Link>
-        <nav style={{ display: "flex", gap: 24, flexGrow: 1 }}>
+        <nav style={{ display: "flex", gap: 24, flexGrow: 1, flexShrink: 0 }}>
           {NAV_ITEMS.map((item) => {
             const active = item.key === current;
             return (
@@ -64,7 +63,19 @@ export function AppHeader({ current, email }: AppHeaderProps) {
           })}
         </nav>
         {email ? (
-          <span style={{ fontSize: 14, color: "var(--color-text-muted)" }}>{email}</span>
+          <span
+            title={email}
+            style={{
+              fontSize: 14,
+              color: "var(--color-text-muted)",
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }}
+          >
+            {email}
+          </span>
         ) : null}
       </div>
     </header>
