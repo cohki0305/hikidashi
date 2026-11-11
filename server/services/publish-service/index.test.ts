@@ -479,4 +479,33 @@ describe("PublishService.cleanupExpired", () => {
     expect((await uploadRow(testDb.db, usedId))?.status).toBe("used");
     expect((await uploadRow(testDb.db, usedId))?.r2Key).toBeTruthy();
   });
+
+  test("zip の削除に失敗した受け皿は pending のままにして次回にやり直せる", async () => {
+    const { testDb, fake, service } = setup();
+    const uploadId = await uploadZip(fake, service, "dev@example.com", skillZip("alpha"));
+    const key = `uploads/${uploadId}.zip`;
+    testDb.db
+      .update(uploads)
+      .set({ expiresAt: "2025-12-31T23:59:59.000Z" })
+      .where(eq(uploads.id, uploadId))
+      .run();
+
+    const failingService = new PublishService({
+      skills: new SkillRepository(testDb.db),
+      versions: new SkillVersionRepository(testDb.db),
+      files: new SkillFileRepository(testDb.db),
+      uploads: new UploadRepository(testDb.db),
+      bucket: { ...fake.bucket, delete: async () => Promise.reject(new Error("削除失敗")) },
+      s3: CONFIG,
+      now: () => NOW
+    });
+
+    expect(await failingService.cleanupExpired(NOW)).toEqual({ expired: 0 });
+    expect((await uploadRow(testDb.db, uploadId))?.status).toBe("pending");
+    expect(fake.objects.has(key)).toBe(true);
+
+    expect(await service.cleanupExpired(NOW)).toEqual({ expired: 1 });
+    expect((await uploadRow(testDb.db, uploadId))?.status).toBe("expired");
+    expect(fake.objects.has(key)).toBe(false);
+  });
 });

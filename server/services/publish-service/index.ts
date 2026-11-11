@@ -177,13 +177,13 @@ export class PublishService {
 
     let expired = 0;
     for (const upload of expiredResult.value) {
-      const marked = await this.deps.uploads.markExpired(upload.id);
-      if (!marked.ok || !marked.value) continue;
       try {
         await this.deps.bucket.delete(upload.r2Key);
       } catch {
         continue;
       }
+      const marked = await this.deps.uploads.markExpired(upload.id);
+      if (!marked.ok || !marked.value) continue;
       expired += 1;
     }
     return { expired };
