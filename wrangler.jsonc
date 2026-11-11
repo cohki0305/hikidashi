@@ -1,0 +1,23 @@
+{
+  "name": "hikidashi",
+  "main": "server/entry/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "html_handling": "none",
+    "binding": "ASSETS",
+    // 画面の無い道に 404 を返すため、配るファイルの道のほかは Worker を先に通す（server/entry/pages.ts）。
+    "run_worker_first": [
+      "/*",
+      "!/assets/*",
+      "!/images/*",
+      "!/favicon.svg",
+      "!/favicon.ico",
+      "!/favicon-32.png",
+      "!/apple-touch-icon.png",
+      "!/robots.txt"
+    ]
+  }
+}
