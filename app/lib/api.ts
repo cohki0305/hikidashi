@@ -38,3 +38,21 @@ export async function getJson<T>(
   if (!parsed.success) return failure("upstream", "応答の形が想定と違います");
   return { ok: true, value: parsed.data };
 }
+
+/** GET でテキストを受け取り Result にする。例外は投げない。 */
+export async function getText(path: string, fetchImpl?: typeof fetch): Promise<Result<string>> {
+  const doFetch = fetchImpl ?? defaultFetch ?? fetch;
+  let response: Response;
+  try {
+    response = await doFetch(path, { headers: { accept: "text/plain" } });
+  } catch {
+    return failure("upstream", "通信に失敗しました");
+  }
+  if (response.status === 404) return failure("not_found", "見つかりませんでした");
+  if (!response.ok) return failure("upstream", "読み込みに失敗しました");
+  try {
+    return { ok: true, value: await response.text() };
+  } catch {
+    return failure("upstream", "応答を読み取れませんでした");
+  }
+}

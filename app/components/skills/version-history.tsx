@@ -1,13 +1,9 @@
+import { formatDate } from "@/app/lib/utils";
 import type { SkillVersion } from "@/shared/schemas/skills";
 
-/** 日本時間の「M月D日」にする。 */
-export function formatDate(iso: string): string {
-  const jst = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
-  return `${jst.getUTCMonth() + 1}月${jst.getUTCDate()}日`;
-}
-
-/** 版の履歴。渡された順（新しい順）にそのまま並べる。 */
+/** 版の履歴。新しい順（版番号の降順）に並べる。 */
 export function VersionHistory({ versions }: { versions: SkillVersion[] }) {
+  const sorted = [...versions].sort((a, b) => b.version - a.version);
   return (
     <section
       style={{
@@ -21,7 +17,7 @@ export function VersionHistory({ versions }: { versions: SkillVersion[] }) {
       }}
     >
       <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>これまでの版</h2>
-      {versions.map((v) => (
+      {sorted.map((v) => (
         <div
           key={v.version}
           style={{

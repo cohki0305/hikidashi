@@ -26,8 +26,8 @@ afterEach(() => {
   setDefaultFetch(null);
 });
 
-function renderPage() {
-  setDefaultFetch(mockFetch);
+function renderPage(fetchImpl: typeof fetch = mockFetch) {
+  setDefaultFetch(fetchImpl);
   render(
     <QueryClientProvider client={createQueryClient()}>
       <IndexPage />
@@ -69,6 +69,17 @@ describe("スキル一覧", () => {
     await waitFor(() => expect(screen.getByText("Claude Code 専用")).toBeTruthy());
     const link = screen.getByRole("link", { name: /動画の字幕入れ/ });
     expect(link.getAttribute("href")).toBe("/skills/video-subtitles");
+  });
+
+  test("応答の形が違うときは読み込めない案内を出す", async () => {
+    const broken = (async () =>
+      new Response(JSON.stringify({ skills: "x" }), {
+        headers: { "content-type": "application/json" }
+      })) as unknown as typeof fetch;
+    renderPage(broken);
+    await waitFor(() =>
+      expect(screen.getByText("読み込めませんでした。時間をおいて開き直してください")).toBeTruthy()
+    );
   });
 
   test("検索のたびには問い合わせない", async () => {

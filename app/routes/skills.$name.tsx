@@ -3,10 +3,12 @@ import { useState } from "react";
 import { FilePreview } from "@/app/components/skills/file-preview";
 import { FileTree } from "@/app/components/skills/file-tree";
 import { InstallPanel } from "@/app/components/skills/install-panel";
-import { formatDate, VersionHistory } from "@/app/components/skills/version-history";
+import { VersionHistory } from "@/app/components/skills/version-history";
 import { PageShell } from "@/app/components/ui/page-shell";
 import { useMe } from "@/app/hooks/use-me";
 import { useSkill } from "@/app/hooks/use-skill";
+import { useSkillFile } from "@/app/hooks/use-skill-file";
+import { formatDate } from "@/app/lib/utils";
 
 const mutedStyle = { margin: 0, fontSize: 14, color: "var(--color-text-muted)" } as const;
 
@@ -21,6 +23,19 @@ export function SkillDetailPage({ name }: { name: string }) {
   const me = useMe();
   const skill = useSkill(name);
   const [picked, setPicked] = useState<string | null>(null);
+  const detail = skill.data?.ok ? skill.data.value : null;
+  const files = detail?.files ?? [];
+  const selectedPath =
+    picked ??
+    (files.find((f) => f.path === "SKILL.md") ?? files.find((f) => f.isText) ?? files[0])?.path ??
+    null;
+  const selected = files.find((f) => f.path === selectedPath) ?? null;
+  const fileContent = useSkillFile(
+    detail?.skill.name ?? name,
+    detail?.skill.latestVersion ?? 0,
+    selectedPath ?? "",
+    { enabled: Boolean(detail && selected?.isText) }
+  );
   const email = me.data?.ok ? me.data.value.email : undefined;
   const result = skill.data;
 
@@ -39,18 +54,13 @@ export function SkillDetailPage({ name }: { name: string }) {
         <p style={{ ...mutedStyle, fontSize: 15 }}>
           {result.kind === "not_found"
             ? "このスキルは見つかりません"
-            : "スキルを読み込めませんでした。"}
+            : "読み込めませんでした。時間をおいて開き直してください"}
         </p>
       </PageShell>
     );
   }
 
-  const { skill: info, files, versions } = result.value;
-  const selectedPath =
-    picked ??
-    (files.find((f) => f.path === "SKILL.md") ?? files.find((f) => f.isText) ?? files[0])?.path ??
-    null;
-  const selected = files.find((f) => f.path === selectedPath) ?? null;
+  const { skill: info, versions } = result.value;
 
   return (
     <PageShell current="skills" email={email}>
@@ -85,7 +95,11 @@ export function SkillDetailPage({ name }: { name: string }) {
           >
             <FileTree files={files} selected={selectedPath} onSelect={setPicked} />
             <div style={{ borderTop: "1px solid var(--color-border)" }}>
-              <FilePreview name={info.name} version={info.latestVersion} file={selected} />
+              <FilePreview
+                file={selected}
+                content={fileContent.data}
+                isPending={fileContent.isPending}
+              />
             </div>
           </section>
           <VersionHistory versions={versions} />

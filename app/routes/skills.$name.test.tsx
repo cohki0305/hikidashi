@@ -20,17 +20,13 @@ mock.module("@tanstack/react-router", () => ({ ...actualRouter, Link }));
 
 const { SkillDetailPage } = await import("./skills.$name");
 
-const realFetch = globalThis.fetch;
-
 afterEach(() => {
   cleanup();
   setDefaultFetch(null);
-  globalThis.fetch = realFetch;
 });
 
-function renderPage(name: string) {
-  setDefaultFetch(mockFetch);
-  globalThis.fetch = mockFetch;
+function renderPage(name: string, fetchImpl: typeof fetch = mockFetch) {
+  setDefaultFetch(fetchImpl);
   render(
     <QueryClientProvider client={createQueryClient()}>
       <SkillDetailPage name={name} />
@@ -49,23 +45,35 @@ describe("スキルの詳細", () => {
     expect(screen.getByRole("link", { name: "← スキル一覧" })).toBeTruthy();
   });
 
+  function recordingFetch(urls: string[]): typeof fetch {
+    return ((input: RequestInfo | URL, init?: RequestInit) => {
+      urls.push(String(input));
+      return mockFetch(input, init);
+    }) as typeof fetch;
+  }
+
   test("ファイルと版の履歴と手元に入れる欄が並び、SKILL.md の中身が出る", async () => {
-    renderPage("minutes-summary");
+    const urls: string[] = [];
+    renderPage("minutes-summary", recordingFetch(urls));
     await waitFor(() => expect(screen.getByText(/内容を読む/)).toBeTruthy());
+    expect(urls.some((url) => url.includes("path=SKILL.md"))).toBe(true);
     expect(screen.getByRole("button", { name: /template\.md/ })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "これまでの版" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "手元に入れる" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /template\.md/ }));
     await waitFor(() => expect(screen.getByText(/## 要約/)).toBeTruthy());
+    expect(urls.some((url) => url.includes("path=template.md"))).toBe(true);
   });
 
   test("動画入りのスキルは動画の中身を取りに行かない", async () => {
-    renderPage("video-subtitles");
+    const urls: string[] = [];
+    renderPage("video-subtitles", recordingFetch(urls));
     await waitFor(() =>
       expect(screen.getByRole("heading", { name: "動画の字幕入れ" })).toBeTruthy()
     );
     fireEvent.click(screen.getByRole("button", { name: /intro\.mp4/ }));
     expect(screen.getByText("プレビューできないファイルです")).toBeTruthy();
+    expect(urls.some((url) => url.includes("intro.mp4"))).toBe(false);
     fireEvent.click(screen.getByRole("tab", { name: "claude.ai" }));
     expect(screen.getByText("このスキルは大きいため Claude Code でだけ使えます")).toBeTruthy();
   });
@@ -74,5 +82,16 @@ describe("スキルの詳細", () => {
     renderPage("nothing");
     await waitFor(() => expect(screen.getByText("このスキルは見つかりません")).toBeTruthy());
     expect(screen.getByRole("link", { name: "← スキル一覧" }).getAttribute("href")).toBe("/");
+  });
+
+  test("応答の形が違うときは読み込めない案内を出す", async () => {
+    const broken = (async () =>
+      new Response(JSON.stringify({ skill: { title: 1 } }), {
+        headers: { "content-type": "application/json" }
+      })) as unknown as typeof fetch;
+    renderPage("minutes-summary", broken);
+    await waitFor(() =>
+      expect(screen.getByText("読み込めませんでした。時間をおいて開き直してください")).toBeTruthy()
+    );
   });
 });

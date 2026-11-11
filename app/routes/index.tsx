@@ -43,7 +43,9 @@ export function IndexPage() {
       </div>
 
       {loading ? <p style={mutedStyle}>読み込み中です…</p> : null}
-      {failed ? <p style={mutedStyle}>スキルを読み込めませんでした。</p> : null}
+      {failed ? (
+        <p style={mutedStyle}>読み込めませんでした。時間をおいて開き直してください</p>
+      ) : null}
       {!loading && !failed ? <p style={mutedStyle}>{countLabel}</p> : null}
 
       {!loading && !failed && shown.length === 0 ? (

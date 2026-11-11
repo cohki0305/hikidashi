@@ -1,10 +1,5 @@
+import { formatDate } from "@/app/lib/utils";
 import type { SkillSummary } from "@/shared/schemas/skills";
-
-/** 日本時間の「M月D日」にする。 */
-function formatDate(iso: string): string {
-  const jst = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
-  return `${jst.getUTCMonth() + 1}月${jst.getUTCDate()}日`;
-}
 
 /** 一覧に並ぶスキル 1 件分のカード。詳細へのリンクになる。 */
 export function SkillCard({ skill }: { skill: SkillSummary }) {
