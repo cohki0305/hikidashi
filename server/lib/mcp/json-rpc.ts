@@ -9,6 +9,9 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const MCP_INSTRUCTIONS =
   "hikidashi はチームのスキルの置き場です。Claude Code では、会話の始めに ~/.claude/skills/*/.hikidashi.json を読み、check_skill_updates に渡してください。新しい版があれば、スキルの名前と新しい版を利用者に伝え、同意を得てから入れ直してください。勝手に上書きしないでください。";
 
+/** 入れる・公開する準備がまだできていないときに返す文言。 */
+export const MISSING_CONFIG_MESSAGE = "管理者が設定を終えていません。管理者に確かめてください。";
+
 /** 名前で引いたスキルの最新版。 */
 export type SkillLatest = { name: string; latestVersion: number; fingerprint: string };
 
@@ -19,8 +22,55 @@ export type SkillCatalog = {
   latestByNames(names: readonly string[]): Promise<Result<SkillLatest[]>>;
 };
 
-/** ツールを呼んだ人のメールアドレスと、スキルを読む口。 */
-export type McpToolContext = { email: string; skills: SkillCatalog };
+/** 入れるスキルの版と、ダウンロードに使う情報。 */
+export type InstallInfo = {
+  name: string;
+  version: number;
+  fingerprint: string;
+  sizeBytes: number;
+  claudeCodeOnly: boolean;
+  downloadUrl: string;
+  expiresInSeconds: number;
+};
+
+/** 公開の受け皿。 */
+export type PublishTicket = {
+  uploadId: string;
+  uploadUrl: string;
+  expiresAt: string;
+  maxBytes: number;
+};
+
+/** 公開の結果。公開できたときだけ新しい指紋を返す。 */
+export type PublishResult =
+  | {
+      status: "published";
+      name: string;
+      version: number;
+      fingerprint: string;
+      fileCount: number;
+      sizeBytes: number;
+    }
+  | { status: "unchanged"; name: string; version: number };
+
+/** スキルを手元に入れるための口。 */
+export type InstallPort = {
+  installInfo(name: string, version?: number): Promise<Result<InstallInfo>>;
+};
+
+/** スキルを公開するための口。 */
+export type PublishPort = {
+  begin(email: string): Promise<Result<PublishTicket>>;
+  finish(email: string, uploadId: string, note?: string): Promise<Result<PublishResult>>;
+};
+
+/** ツールを呼んだ人のメールアドレスと、スキルを読む・入れる・公開する口。 */
+export type McpToolContext = {
+  email: string;
+  skills: SkillCatalog;
+  install: InstallPort;
+  publish?: PublishPort;
+};
 
 /** MCP に載せるツール 1 つ。入力の検証は input の zod に任せる。 */
 export type McpTool<I> = {

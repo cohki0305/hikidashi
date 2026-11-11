@@ -23,7 +23,11 @@ function buildCatalog() {
       );
     }
   };
-  const context: McpToolContext = { email: "member@example.test", skills };
+  const context: McpToolContext = {
+    email: "member@example.test",
+    skills,
+    install: { installInfo: async () => notFound("使いません") }
+  };
   return { calls, context };
 }
 

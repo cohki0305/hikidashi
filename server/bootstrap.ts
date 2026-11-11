@@ -115,10 +115,11 @@ export function oauthServiceFromEnv(env: BootstrapEnv): OauthService | undefined
 /** スキルと OAuth が揃ったときだけ、MCP の service を組み立てる。 */
 export function mcpServiceFromEnv(
   oauth: OauthService | undefined,
-  skills: SkillService | undefined
+  skills: SkillService | undefined,
+  publish: PublishService | undefined
 ): McpService | undefined {
   if (!oauth || !skills) return undefined;
-  return new McpService({ oauth, skills });
+  return new McpService({ oauth, skills, install: skills, publish });
 }
 
 /** 依存を組み立てて Hono アプリを返す。束縛はリクエストごとに渡る。 */
@@ -132,12 +133,13 @@ export function bootstrap(
   void env.ASSETS;
   const skillService = skillServiceFromEnv(env);
   const oauthService = oauthServiceFromEnv(env);
+  const publishService = publishServiceFromEnv(env);
   return createApp({
     logError,
     skillService,
     accessVerifier: accessVerifierFromEnv(env),
     oauth: oauthService,
-    mcp: mcpServiceFromEnv(oauthService, skillService),
+    mcp: mcpServiceFromEnv(oauthService, skillService, publishService),
     appUrl: appUrlFromEnv(env)
   });
 }

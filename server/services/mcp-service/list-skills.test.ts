@@ -24,7 +24,8 @@ function context(skills: Pick<SkillCatalog, "list">): McpToolContext {
       list: skills.list,
       show: async () => notFound("スキルが見つかりません"),
       latestByNames: async () => ok([])
-    }
+    },
+    install: { installInfo: async () => notFound("使いません") }
   };
 }
 

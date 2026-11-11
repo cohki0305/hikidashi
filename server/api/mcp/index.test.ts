@@ -149,11 +149,17 @@ describe("JSON-RPC の往復", () => {
     });
   });
 
-  test("tools/list は 2 つのツールを入力の形つきで返す", async () => {
+  test("tools/list は 5 つのツールを入力の形つきで返す", async () => {
     const res = await rpc(build(), { jsonrpc: "2.0", id: 2, method: "tools/list" }, LIVE);
     const body = await json(res);
     const tools = (body.result as { tools: { name: string; inputSchema: unknown }[] }).tools;
-    expect(tools.map((tool) => tool.name)).toEqual(["list_skills", "check_skill_updates"]);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "list_skills",
+      "check_skill_updates",
+      "install_skill",
+      "begin_publish",
+      "finish_publish"
+    ]);
     for (const tool of tools) expect(tool.inputSchema).toMatchObject({ type: "object" });
   });
 

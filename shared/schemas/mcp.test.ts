@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { checkSkillUpdatesInputSchema, listSkillsInputSchema } from "./mcp";
+import {
+  beginPublishInputSchema,
+  checkSkillUpdatesInputSchema,
+  finishPublishInputSchema,
+  installSkillInputSchema,
+  listSkillsInputSchema
+} from "./mcp";
 
 const installed = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
@@ -38,6 +44,32 @@ describe("MCP ツールの入力", () => {
       checkSkillUpdatesInputSchema.safeParse({
         installed: [{ name: "skill-a", fingerprint: "f" }]
       }).success
+    ).toBe(false);
+  });
+
+  test("install_skill は名前だけでも版つきでも受ける", () => {
+    expect(installSkillInputSchema.safeParse({ name: "invoice-entry" }).success).toBe(true);
+    expect(installSkillInputSchema.safeParse({ name: "invoice-entry", version: 2 }).success).toBe(
+      true
+    );
+    expect(installSkillInputSchema.safeParse({ name: "Invoice" }).success).toBe(false);
+    expect(installSkillInputSchema.safeParse({ name: "invoice-entry", version: 0 }).success).toBe(
+      false
+    );
+  });
+
+  test("begin_publish は入力を取らない", () => {
+    expect(beginPublishInputSchema.safeParse({}).success).toBe(true);
+  });
+
+  test("finish_publish は受け皿を必須にし、note は 500 字まで受ける", () => {
+    expect(finishPublishInputSchema.safeParse({ uploadId: "upload-1" }).success).toBe(true);
+    expect(finishPublishInputSchema.safeParse({ uploadId: "" }).success).toBe(false);
+    expect(
+      finishPublishInputSchema.safeParse({ uploadId: "upload-1", note: "あ".repeat(500) }).success
+    ).toBe(true);
+    expect(
+      finishPublishInputSchema.safeParse({ uploadId: "upload-1", note: "あ".repeat(501) }).success
     ).toBe(false);
   });
 });

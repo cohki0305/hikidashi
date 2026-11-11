@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SkillCatalog } from "@/server/lib/mcp/json-rpc";
+import { MISSING_CONFIG_MESSAGE, type SkillCatalog } from "@/server/lib/mcp/json-rpc";
 import { ok, upstream } from "@/server/lib/result";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 import { McpService } from "./index";
@@ -64,10 +64,16 @@ describe("McpService", () => {
     expect(await service.authenticate("hkd_at_dead")).toBeNull();
   });
 
-  test("tools/list は入力の形つきで 2 つ返す", () => {
+  test("tools/list は入力の形つきで 5 つ返す", () => {
     const { service } = build();
     const tools = service.handlersFor(context).listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["list_skills", "check_skill_updates"]);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "list_skills",
+      "check_skill_updates",
+      "install_skill",
+      "begin_publish",
+      "finish_publish"
+    ]);
     for (const tool of tools) expect(tool.inputSchema).toMatchObject({ type: "object" });
   });
 
@@ -87,6 +93,29 @@ describe("McpService", () => {
     ).toEqual({
       kind: "error",
       content: "入力が正しくありません"
+    });
+    expect(
+      await handlers.callTool("finish_publish", { uploadId: "upload-1", note: "あ".repeat(501) })
+    ).toEqual({
+      kind: "error",
+      content: "入力が正しくありません"
+    });
+  });
+
+  test("入れる・公開する口が無い環境では管理者向けの文言で断る", async () => {
+    const { service } = build();
+    const handlers = service.handlersFor(context);
+    expect(await handlers.callTool("install_skill", { name: "invoice-entry" })).toEqual({
+      kind: "error",
+      content: MISSING_CONFIG_MESSAGE
+    });
+    expect(await handlers.callTool("begin_publish", {})).toEqual({
+      kind: "error",
+      content: MISSING_CONFIG_MESSAGE
+    });
+    expect(await handlers.callTool("finish_publish", { uploadId: "upload-1" })).toEqual({
+      kind: "error",
+      content: MISSING_CONFIG_MESSAGE
     });
   });
 

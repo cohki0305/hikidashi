@@ -42,6 +42,7 @@ export type FinishPublishResult =
       status: "published";
       name: string;
       version: number;
+      fingerprint: string;
       fileCount: number;
       sizeBytes: number;
     }
@@ -56,7 +57,7 @@ export class PublishService {
     email: string
   ): Promise<Result<{ uploadId: string; uploadUrl: string; expiresAt: string; maxBytes: number }>> {
     const config = this.deps.s3;
-    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE);
+    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE, { missingConfig: true });
 
     const uploadId = crypto.randomUUID();
     const r2Key = `uploads/${uploadId}.zip`;
@@ -90,6 +91,9 @@ export class PublishService {
     uploadId: string,
     note?: string
   ): Promise<Result<FinishPublishResult>> {
+    const config = this.deps.s3;
+    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE, { missingConfig: true });
+
     const now = this.deps.now ?? (() => new Date());
     const uploadResult = await this.deps.uploads.findById(uploadId);
     if (!uploadResult.ok) return uploadResult;
@@ -98,9 +102,6 @@ export class PublishService {
       return notFound("この受け皿は見つかりません");
     if (upload.status !== "pending" || Date.parse(upload.expiresAt) <= now().getTime())
       return invalid(EXPIRED_MESSAGE);
-
-    const config = this.deps.s3;
-    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE);
 
     const head = await this.head(upload);
     if (!head.ok) return head;
@@ -161,6 +162,7 @@ export class PublishService {
       status: "published",
       name: skill.name,
       version,
+      fingerprint: skill.fingerprint,
       fileCount: skill.fileCount,
       sizeBytes: skill.sizeBytes
     });

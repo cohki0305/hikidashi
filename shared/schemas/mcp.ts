@@ -20,3 +20,21 @@ export const listSkillsInputSchema = z.object({
   query: z.string().trim().max(200).optional()
 });
 export type ListSkillsInput = z.infer<typeof listSkillsInputSchema>;
+
+/** MCP の install_skill が受け取る、入れるスキルの名前と版。 */
+export const installSkillInputSchema = z.object({
+  name: skillNameSchema,
+  version: z.number().int().positive().optional()
+});
+export type InstallSkillInput = z.infer<typeof installSkillInputSchema>;
+
+/** MCP の begin_publish が受け取る入力（無し）。 */
+export const beginPublishInputSchema = z.object({});
+export type BeginPublishInput = z.infer<typeof beginPublishInputSchema>;
+
+/** MCP の finish_publish が受け取る、受け皿と公開のメモ。 */
+export const finishPublishInputSchema = z.object({
+  uploadId: z.string().min(1),
+  note: z.string().max(500).optional()
+});
+export type FinishPublishInput = z.infer<typeof finishPublishInputSchema>;
