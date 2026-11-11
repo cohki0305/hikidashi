@@ -1,0 +1,5 @@
+[install]
+saveTextLockfile = false
+
+[test]
+preload = ["./tests/preload.ts", "./tests/helpers/dom-setup.ts"]

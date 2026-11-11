@@ -1,7 +1,16 @@
 node_modules/
+.env
 dist/
+build/
+.output/
 .wrangler/
+worker-configuration.d.ts
 .dev.vars
+.worktree-setup-done
+.cache/
+*.log
+.DS_Store
 .claude/settings.local.json
 .agent-pipeline.local.json
 .pipeline/
+*.tsbuildinfo

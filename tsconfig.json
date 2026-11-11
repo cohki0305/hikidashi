@@ -1,0 +1,22 @@
+{
+  // tsc は入力が 1 つも無いと失敗するため、設定ファイルの JSON も入力に含める
+  "include": ["**/*", "**/*.json"],
+  "exclude": ["node_modules", "dist", ".wrangler", "tests/fixtures/**"],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["bun", "vite/client"],
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}
