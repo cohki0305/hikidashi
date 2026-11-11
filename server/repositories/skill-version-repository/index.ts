@@ -9,6 +9,9 @@ const MAX_SKILL_IDS_PER_QUERY = 100;
 /** skill_versions テーブルの 1 行。 */
 export type SkillVersionRow = typeof skillVersions.$inferSelect;
 
+/** batch にまとめる書き込み 1 文。 */
+type BatchStatement = { execute: () => Promise<unknown> };
+
 /** skill_versions テーブルの読み書き。 */
 export class SkillVersionRepository {
   constructor(private readonly db: SkillDb) {}
@@ -67,5 +70,10 @@ export class SkillVersionRepository {
     } catch {
       return upstream("スキルの版を読めませんでした");
     }
+  }
+
+  /** 版を作る文。 */
+  insertStatement(row: SkillVersionRow): BatchStatement {
+    return this.db.insert(skillVersions).values(row);
   }
 }

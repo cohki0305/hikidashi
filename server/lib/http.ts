@@ -24,6 +24,16 @@ export function stream(c: Context, body: ReadableStream, headers: Record<string,
   return c.body(body, 200, headers);
 }
 
+/** 一時 URL など別の場所へ 302 で渡す。 */
+export function redirect(c: Context, location: string) {
+  return c.redirect(location, 302);
+}
+
+/** 設定が欠けていて処理を提供できないときの応答。fail closed に使う。 */
+export function unavailable(c: Context, message: string) {
+  return c.json({ error: message, kind: "upstream", details: null }, 503);
+}
+
 export function failure(c: Context, err: Err) {
   return c.json(
     {

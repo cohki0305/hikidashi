@@ -1,3 +1,4 @@
+import { presignGet, type R2S3Config } from "@/server/lib/r2/presign";
 import { notFound, ok, type Result, upstream } from "@/server/lib/result";
 import { openEntryStream, r2RangeSource, readCentralDirectory } from "@/server/lib/zip";
 import type { SkillFileRepository } from "@/server/repositories/skill-file-repository";
@@ -20,6 +21,7 @@ export type SkillServiceDeps = {
   files: SkillFileRepository;
   bucket: R2Bucket;
   claudeAiMaxBytes?: number;
+  s3?: R2S3Config;
 };
 
 async function readAll(
@@ -67,13 +69,6 @@ export class SkillService {
     );
     if (!versionsResult.ok) return versionsResult;
 
-    const latestBySkill = new Map<string, SkillVersionRow>();
-    for (const version of versionsResult.value) {
-      const current = latestBySkill.get(version.skillId);
-      if (current === undefined || version.version > current.version)
-        latestBySkill.set(version.skillId, version);
-    }
-
     const normalized = query.trim().toLowerCase();
     const summaries: SkillSummary[] = [];
     for (const skill of skillsResult.value) {
@@ -84,7 +79,9 @@ export class SkillService {
         )
       )
         continue;
-      const latest = latestBySkill.get(skill.id);
+      const latest = versionsResult.value.find(
+        (version) => version.skillId === skill.id && version.version === skill.latestVersion
+      );
       if (latest === undefined) continue;
       summaries.push(this.toSummary(skill, latest));
     }
@@ -185,6 +182,56 @@ export class SkillService {
     } catch {
       return upstream("zip を読めませんでした");
     }
+  }
+
+  /** 指定の版（省略時は最新版）を入れるための、600 秒有効の署名付きダウンロード URL を返す。 */
+  async installInfo(
+    name: string,
+    requestedVersion?: number
+  ): Promise<
+    Result<{
+      name: string;
+      version: number;
+      fingerprint: string;
+      sizeBytes: number;
+      claudeCodeOnly: boolean;
+      downloadUrl: string;
+      expiresInSeconds: 600;
+    }>
+  > {
+    const skillResult = await this.deps.skills.findByName(name);
+    if (!skillResult.ok) return skillResult;
+    const skill = skillResult.value;
+    if (skill === null) return notFound("スキルが見つかりません");
+
+    const versionResult = await this.deps.versions.findBySkillIdAndVersion(
+      skill.id,
+      requestedVersion ?? skill.latestVersion
+    );
+    if (!versionResult.ok) return versionResult;
+    const version = versionResult.value;
+    if (version === null) return notFound("スキルの版が見つかりません");
+
+    const config = this.deps.s3;
+    if (config === undefined)
+      return upstream("R2 の S3 の設定が足りません", { missingConfig: true });
+
+    let downloadUrl: string;
+    try {
+      downloadUrl = await presignGet(config, version.r2Key);
+    } catch {
+      return upstream("ダウンロード URL を作れませんでした");
+    }
+
+    return ok({
+      name: skill.name,
+      version: version.version,
+      fingerprint: version.fingerprint,
+      sizeBytes: version.sizeBytes,
+      claudeCodeOnly: version.sizeBytes > this.claudeAiMaxBytes,
+      downloadUrl,
+      expiresInSeconds: 600
+    });
   }
 
   private async resolveVersion(
