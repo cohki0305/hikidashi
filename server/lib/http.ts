@@ -14,6 +14,16 @@ export function ok<T>(c: Context, body: T) {
   return c.json(body, 200);
 }
 
+/** text/plain の応答。 */
+export function text(c: Context, body: string) {
+  return c.body(body, 200, { "Content-Type": "text/plain; charset=utf-8" });
+}
+
+/** stream をそのまま流す応答。ヘッダーは呼び出し側が決める。 */
+export function stream(c: Context, body: ReadableStream, headers: Record<string, string>) {
+  return c.body(body, 200, headers);
+}
+
 export function failure(c: Context, err: Err) {
   return c.json(
     {
