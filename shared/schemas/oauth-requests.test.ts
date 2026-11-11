@@ -5,22 +5,45 @@ import {
 } from "@/shared/schemas/oauth-requests";
 
 describe("oauthRequestResponseSchema", () => {
-  test("つなぐ相手の名前と状態を持つ", () => {
-    expect(oauthRequestResponseSchema.parse({ clientName: "Claude", status: "pending" })).toEqual({
+  test("つなぐ相手の名前と戻り先のホストと状態を持つ", () => {
+    expect(
+      oauthRequestResponseSchema.parse({
+        clientName: "Claude",
+        redirectHost: "claude.ai",
+        status: "pending"
+      })
+    ).toEqual({
       clientName: "Claude",
+      redirectHost: "claude.ai",
       status: "pending"
     });
-    expect(oauthRequestResponseSchema.parse({ clientName: "Claude", status: "expired" })).toEqual({
+    expect(
+      oauthRequestResponseSchema.parse({
+        clientName: "Claude",
+        redirectHost: "claude.ai",
+        status: "expired"
+      })
+    ).toEqual({
       clientName: "Claude",
+      redirectHost: "claude.ai",
       status: "expired"
     });
   });
 
-  test("知らない状態・名前の欠けは弾く", () => {
+  test("知らない状態・名前や戻り先の欠けは弾く", () => {
     expect(
-      oauthRequestResponseSchema.safeParse({ clientName: "Claude", status: "done" }).success
+      oauthRequestResponseSchema.safeParse({
+        clientName: "Claude",
+        redirectHost: "claude.ai",
+        status: "done"
+      }).success
     ).toBe(false);
-    expect(oauthRequestResponseSchema.safeParse({ status: "pending" }).success).toBe(false);
+    expect(
+      oauthRequestResponseSchema.safeParse({ redirectHost: "claude.ai", status: "pending" }).success
+    ).toBe(false);
+    expect(
+      oauthRequestResponseSchema.safeParse({ clientName: "Claude", status: "pending" }).success
+    ).toBe(false);
   });
 });
 

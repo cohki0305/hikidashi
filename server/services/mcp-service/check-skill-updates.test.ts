@@ -1,57 +1,36 @@
 import { describe, expect, test } from "bun:test";
+import type { McpToolContext, SkillCatalog } from "@/server/lib/mcp/json-rpc";
 import { notFound, ok } from "@/server/lib/result";
-import type { SkillService } from "@/server/services/skill-service";
-import type { SkillDetailResponse } from "@/shared/schemas/skills";
 import { checkSkillUpdatesTool } from "./check-skill-updates";
 
-function detail(name: string, version: number, fingerprint: string): SkillDetailResponse {
-  return {
-    skill: {
-      name,
-      title: name,
-      description: `${name} の説明`,
-      latestVersion: version,
-      updatedAt: "2026-10-20T00:00:00.000Z",
-      author: "hanako@example.test",
-      sizeBytes: 10,
-      claudeCodeOnly: false
-    },
-    files: [],
-    versions: [
-      {
-        version,
-        note: null,
-        publishedBy: "hanako@example.test",
-        createdAt: "2026-10-20T00:00:00.000Z",
-        fingerprint,
-        sizeBytes: 10,
-        fileCount: 1
-      }
-    ]
-  };
-}
-
-const details: Record<string, SkillDetailResponse> = {
-  "same-skill": detail("same-skill", 3, "fp-same"),
-  "new-skill": detail("new-skill", 4, "fp-new")
+const latest: Record<string, { latestVersion: number; fingerprint: string }> = {
+  "same-skill": { latestVersion: 3, fingerprint: "fp-same" },
+  "new-skill": { latestVersion: 4, fingerprint: "fp-new" }
 };
 
-const skills = {
-  show: async (name: string) => {
-    const found = details[name];
-    return found ? ok(found) : notFound("スキルが見つかりません");
-  }
-} as Pick<SkillService, "list" | "show">;
-
-function context() {
-  return { email: "member@example.test", skills } as unknown as Parameters<
-    typeof checkSkillUpdatesTool.call
-  >[0];
+function buildCatalog() {
+  const calls: string[][] = [];
+  const skills: SkillCatalog = {
+    list: async () => ok([]),
+    show: async () => notFound("スキルが見つかりません"),
+    latestByNames: async (names) => {
+      calls.push([...names]);
+      return ok(
+        names.flatMap((name) => {
+          const found = latest[name];
+          return found === undefined ? [] : [{ name, ...found }];
+        })
+      );
+    }
+  };
+  const context: McpToolContext = { email: "member@example.test", skills };
+  return { calls, context };
 }
 
 describe("check_skill_updates", () => {
   test("指紋が同じなら版番号が違っても up_to_date", async () => {
-    const result = await checkSkillUpdatesTool.call(context(), {
+    const { calls, context } = buildCatalog();
+    const result = await checkSkillUpdatesTool.call(context, {
       installed: [{ name: "same-skill", version: 1, fingerprint: "fp-same" }]
     });
     expect(result).toEqual({
@@ -67,10 +46,12 @@ describe("check_skill_updates", () => {
         ]
       }
     });
+    expect(calls).toEqual([["same-skill"]]);
   });
 
   test("指紋が違えば update_available、無いスキルは not_found", async () => {
-    const result = await checkSkillUpdatesTool.call(context(), {
+    const { calls, context } = buildCatalog();
+    const result = await checkSkillUpdatesTool.call(context, {
       installed: [
         { name: "new-skill", version: 2, fingerprint: "fp-old" },
         { name: "missing-skill", version: 1, fingerprint: "fp-missing" }
@@ -90,5 +71,6 @@ describe("check_skill_updates", () => {
         ]
       }
     });
+    expect(calls).toEqual([["new-skill", "missing-skill"]]);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { OAuthServicePort } from "@/server/api/oauth";
 import { createApp } from "@/server/app";
 import type { AccessVerifier } from "@/server/lib/access/verify-access-jwt";
-import { forbidden, invalid, ok } from "@/server/lib/result";
+import { forbidden, invalid, ok, upstream } from "@/server/lib/result";
 
 const APP_URL = "https://hikidashi.example.test";
 const REDIRECT = "https://claude.ai/api/mcp/auth_callback";
@@ -272,6 +272,39 @@ describe("公開の OAuth ルート", () => {
     expect(response.status).toBe(400);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toEqual({ error: "invalid_grant" });
+  });
+
+  test("token の DB 失敗は 503 temporarily_unavailable", async () => {
+    for (const over of [
+      { exchangeCode: async () => upstream("コードを引き換えられませんでした") },
+      { refresh: async () => upstream("トークンを更新できませんでした") }
+    ] as Partial<OAuthServicePort>[]) {
+      const { app } = appWith(over);
+      const response = await postForm(
+        app,
+        over.exchangeCode
+          ? codeFields
+          : {
+              grant_type: "refresh_token",
+              refresh_token: "hkd_rt_x",
+              client_id: "client-1"
+            }
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await response.json()).toEqual({ error: "temporarily_unavailable" });
+    }
+  });
+
+  test("register の DB 失敗は 503 temporarily_unavailable", async () => {
+    const { app } = appWith({ register: async () => upstream("登録できませんでした") });
+    const response = await postJson(
+      app,
+      "/oauth/register",
+      JSON.stringify({ redirect_uris: [REDIRECT] })
+    );
+    expect(response.status).toBe(503);
+    expect(await errorOf(response)).toBe("temporarily_unavailable");
   });
 
   test("token の足りない項目・grant_type 無しは invalid_request で Service を呼ばない", async () => {

@@ -45,8 +45,10 @@ const detail: SkillDetailResponse = {
 
 const skills = {
   list: async () => ok([summary]),
-  show: async () => ok(detail)
-} as Pick<SkillService, "list" | "show">;
+  show: async () => ok(detail),
+  latestByNames: async () =>
+    ok([{ name: summary.name, latestVersion: summary.latestVersion, fingerprint: "fp-latest" }])
+} as Pick<SkillService, "list" | "show" | "latestByNames">;
 
 function build(
   options: { mcp?: McpServicePort; appUrl?: string } = {}

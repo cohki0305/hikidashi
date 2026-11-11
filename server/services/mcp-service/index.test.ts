@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { SkillCatalog } from "@/server/lib/mcp/json-rpc";
 import { ok, upstream } from "@/server/lib/result";
-import type { SkillService } from "@/server/services/skill-service";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 import { McpService } from "./index";
 
@@ -31,11 +31,20 @@ const detail: SkillDetailResponse = {
   ]
 };
 
-function build(over: { list?: SkillService["list"]; show?: SkillService["show"] } = {}) {
-  const skills = {
+function build(
+  over: {
+    list?: SkillCatalog["list"];
+    show?: SkillCatalog["show"];
+    latestByNames?: SkillCatalog["latestByNames"];
+  } = {}
+) {
+  const skills: SkillCatalog = {
     list: over.list ?? (async () => ok([summary])),
-    show: over.show ?? (async () => ok(detail))
-  } as Pick<SkillService, "list" | "show">;
+    show: over.show ?? (async () => ok(detail)),
+    latestByNames:
+      over.latestByNames ??
+      (async () => ok([{ name: summary.name, latestVersion: 2, fingerprint: "fp-latest" }]))
+  };
   const calls: string[] = [];
   const oauth = {
     authenticate: async (token: string) => {

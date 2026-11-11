@@ -1,7 +1,10 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { createDb, type SkillDb } from "@/server/db";
 import { skills } from "@/server/db/schema";
 import { ok, type Result, upstream } from "@/server/lib/result";
+
+/** D1 が 1 回の問い合わせで束縛できる値の上限。 */
+const MAX_NAMES_PER_QUERY = 100;
 
 /** skills テーブルの 1 行。 */
 export type SkillRow = typeof skills.$inferSelect;
@@ -29,6 +32,27 @@ export class SkillRepository {
     try {
       const row = await this.db.select().from(skills).where(eq(skills.name, name)).get();
       return ok(row ?? null);
+    } catch {
+      return upstream("スキルを読めませんでした");
+    }
+  }
+
+  /** 複数の名前のスキルをまとめて返す。無い名前は結果に含めない。 */
+  async findByNames(names: readonly string[]): Promise<Result<SkillRow[]>> {
+    if (names.length === 0) return ok([]);
+    try {
+      const rows: SkillRow[] = [];
+      for (let start = 0; start < names.length; start += MAX_NAMES_PER_QUERY) {
+        const batch = names.slice(start, start + MAX_NAMES_PER_QUERY);
+        rows.push(
+          ...(await this.db
+            .select()
+            .from(skills)
+            .where(inArray(skills.name, [...batch]))
+            .all())
+        );
+      }
+      return ok(rows);
     } catch {
       return upstream("スキルを読めませんでした");
     }

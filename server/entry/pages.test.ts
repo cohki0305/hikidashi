@@ -66,6 +66,7 @@ describe("isAppPath", () => {
     for (const path of [
       "/api",
       "/api/health",
+      "/mcp",
       "/oauth/authorize",
       "/oauth/token",
       "/.well-known/oauth-authorization-server"

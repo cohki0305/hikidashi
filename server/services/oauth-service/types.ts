@@ -15,4 +15,8 @@ export type AuthorizationStart =
 
 export type TokenSet = { accessToken: string; refreshToken: string; expiresIn: number };
 
-export type RequestDescription = { clientName: string; status: "pending" | "expired" };
+export type RequestDescription = {
+  clientName: string;
+  redirectHost: string;
+  status: "pending" | "expired";
+};

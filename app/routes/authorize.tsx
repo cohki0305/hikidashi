@@ -9,6 +9,17 @@ import {
 const EXPIRED_MESSAGE = "この画面は期限が切れました。Claude の画面からもう一度つないでください。";
 const FAILED_MESSAGE = "うまくいきませんでした。時間をおいて開き直してください。";
 
+function isTrustedRedirectHost(host: string): boolean {
+  const hostname = host.replace(/:\d+$/, "").toLowerCase();
+  return (
+    hostname === "claude.ai" ||
+    hostname.endsWith(".claude.ai") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
 const cardStyle = {
   width: "100%",
   maxWidth: 460,
@@ -133,6 +144,29 @@ export function AuthorizePage({
             >
               {`${view.clientName} がチームのスキルを探し、入れられるようになります。`}
             </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                lineHeight: 1.7,
+                color: "var(--color-text-sub)"
+              }}
+            >
+              {`つないだ後は ${view.redirectHost} に戻ります。`}
+            </p>
+            {isTrustedRedirectHost(view.redirectHost) ? null : (
+              <p
+                role="note"
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: "var(--color-text-sub)"
+                }}
+              >
+                この戻り先に心当たりがないときは、「やめる」を押してください。
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
               <button
                 type="button"

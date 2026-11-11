@@ -1,7 +1,12 @@
 import type { Context } from "hono";
 
 /** RFC 6749 のエラー応答。トークンを扱う応答は保存させない。 */
-export function oauthError(c: Context, status: 400 | 429, error: string, description?: string) {
+export function oauthError(
+  c: Context,
+  status: 400 | 429 | 503,
+  error: string,
+  description?: string
+) {
   c.header("Cache-Control", "no-store");
   return c.json(description ? { error, error_description: description } : { error }, status);
 }

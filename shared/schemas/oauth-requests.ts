@@ -6,6 +6,7 @@ export const oauthRequestStatusSchema = z.enum(["pending", "expired"]);
 /** GET /api/oauth-requests/:id の応答。許可の画面に出す相手と状態。 */
 export const oauthRequestResponseSchema = z.object({
   clientName: z.string(),
+  redirectHost: z.string(),
   status: oauthRequestStatusSchema
 });
 export type OAuthRequestResponse = z.infer<typeof oauthRequestResponseSchema>;

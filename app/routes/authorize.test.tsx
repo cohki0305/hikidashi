@@ -5,7 +5,12 @@ import { AuthorizePage } from "./authorize";
 const REQUEST_ID = "11111111-1111-4111-8111-111111111111";
 const originalFetch = globalThis.fetch;
 
-type Options = { status?: number; statusField?: "pending" | "expired" };
+type Options = {
+  status?: number;
+  statusField?: "pending" | "expired";
+  redirectHost?: string;
+  actionStatus?: number;
+};
 
 /** 受けた呼び出しを記録し、決まった応答を返す偽の fetch。 */
 function stubApi(options: Options = {}) {
@@ -17,8 +22,14 @@ function stubApi(options: Options = {}) {
     if (method === "GET") {
       if (options.status && options.status !== 200)
         return Response.json({ error: "Not found" }, { status: options.status });
-      return Response.json({ clientName: "Claude", status: options.statusField ?? "pending" });
+      return Response.json({
+        clientName: "Claude",
+        redirectHost: options.redirectHost ?? "claude.ai",
+        status: options.statusField ?? "pending"
+      });
     }
+    if (options.actionStatus && options.actionStatus !== 200)
+      return Response.json({ error: "Conflict" }, { status: options.actionStatus });
     return Response.json({
       redirectTo: url.pathname.endsWith("/denials")
         ? "https://claude.ai/cb?error=access_denied&state=st-1"
@@ -48,8 +59,19 @@ describe("許可の画面", () => {
     expect(
       screen.getByText("Claude がチームのスキルを探し、入れられるようになります。")
     ).toBeTruthy();
+    expect(screen.getByText("つないだ後は claude.ai に戻ります。")).toBeTruthy();
+    expect(screen.queryByRole("note")).toBeNull();
     expect(screen.getByRole("button", { name: "つなぐ" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "やめる" })).toBeTruthy();
+  });
+
+  test("知らない戻り先のときは注意書きを添える", async () => {
+    stubApi({ redirectHost: "evil.example.test" });
+    renderPage();
+    expect(await screen.findByText("つないだ後は evil.example.test に戻ります。")).toBeTruthy();
+    expect(
+      screen.getByText("この戻り先に心当たりがないときは、「やめる」を押してください。")
+    ).toBeTruthy();
   });
 
   test("「つなぐ」を押すと許可を送り、戻り先へ移る", async () => {
@@ -72,6 +94,32 @@ describe("許可の画面", () => {
       expect(moved).toEqual(["https://claude.ai/cb?error=access_denied&state=st-1"])
     );
     expect(calls).toContain(`POST /api/oauth-requests/${REQUEST_ID}/denials`);
+  });
+
+  test("「つなぐ」の送信が期限切れなら案内を出す", async () => {
+    stubApi({ actionStatus: 409 });
+    const moved: string[] = [];
+    renderPage((url) => moved.push(url));
+    fireEvent.click(await screen.findByRole("button", { name: "つなぐ" }));
+    expect(
+      await screen.findByText(
+        "この画面は期限が切れました。Claude の画面からもう一度つないでください。"
+      )
+    ).toBeTruthy();
+    expect(moved).toEqual([]);
+  });
+
+  test("「やめる」の送信が期限切れなら案内を出す", async () => {
+    stubApi({ actionStatus: 409 });
+    const moved: string[] = [];
+    renderPage((url) => moved.push(url));
+    fireEvent.click(await screen.findByRole("button", { name: "やめる" }));
+    expect(
+      await screen.findByText(
+        "この画面は期限が切れました。Claude の画面からもう一度つないでください。"
+      )
+    ).toBeTruthy();
+    expect(moved).toEqual([]);
   });
 
   test("期限切れの頼みは案内だけを出す", async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { ok, upstream } from "@/server/lib/result";
-import type { SkillService } from "@/server/services/skill-service";
+import type { McpToolContext, SkillCatalog } from "@/server/lib/mcp/json-rpc";
+import { notFound, ok, upstream } from "@/server/lib/result";
 import type { SkillSummary } from "@/shared/schemas/skills";
 import { listSkillsTool } from "./list-skills";
 
@@ -17,10 +17,15 @@ const summaries: SkillSummary[] = [
   }
 ];
 
-function context(skills: Pick<SkillService, "list" | "show">) {
-  return { email: "member@example.test", skills } as unknown as Parameters<
-    typeof listSkillsTool.call
-  >[0];
+function context(skills: Pick<SkillCatalog, "list">): McpToolContext {
+  return {
+    email: "member@example.test",
+    skills: {
+      list: skills.list,
+      show: async () => notFound("スキルが見つかりません"),
+      latestByNames: async () => ok([])
+    }
+  };
 }
 
 describe("list_skills", () => {
@@ -31,7 +36,7 @@ describe("list_skills", () => {
         calls.push(query);
         return ok(summaries);
       }
-    } as unknown as Pick<SkillService, "list" | "show">;
+    };
 
     const result = await listSkillsTool.call(context(skills), { query: "請求書" });
     expect(result).toEqual({
@@ -59,7 +64,7 @@ describe("list_skills", () => {
         calls.push(query);
         return ok([]);
       }
-    } as unknown as Pick<SkillService, "list" | "show">;
+    };
 
     expect(await listSkillsTool.call(context(skills), {})).toEqual({
       ok: true,
@@ -70,7 +75,7 @@ describe("list_skills", () => {
 
   test("一覧を読めないときは失敗をそのまま返す", async () => {
     const failure = upstream("スキル一覧を読めませんでした");
-    const skills = { list: async () => failure } as unknown as Pick<SkillService, "list" | "show">;
+    const skills = { list: async () => failure };
     expect(await listSkillsTool.call(context(skills), {})).toEqual(failure);
   });
 });

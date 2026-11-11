@@ -182,6 +182,51 @@ describe("SkillService.show", () => {
   });
 });
 
+describe("SkillService.latestByNames", () => {
+  afterEach(() => {
+    while (openDbs.length > 0) openDbs.pop()?.close();
+  });
+
+  test("名前の一覧から最新版の指紋をまとめて返し、無い名前は含めない", async () => {
+    const { testDb, fake, service } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES,
+      versions: 2
+    });
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "beta",
+      title: "ベータ",
+      files: TEXT_FILES
+    });
+
+    const alpha = await service.show("alpha");
+    expect(alpha.ok).toBe(true);
+    if (!alpha.ok) return;
+    const beta = await service.show("beta");
+    expect(beta.ok).toBe(true);
+    if (!beta.ok) return;
+
+    const latest = await service.latestByNames(["alpha", "beta", "missing"]);
+    expect(latest.ok).toBe(true);
+    if (!latest.ok) return;
+    expect([...latest.value].sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+      {
+        name: "alpha",
+        latestVersion: 2,
+        fingerprint: alpha.value.versions[0]?.fingerprint
+      },
+      {
+        name: "beta",
+        latestVersion: 1,
+        fingerprint: beta.value.versions[0]?.fingerprint
+      }
+    ]);
+    expect(await service.latestByNames([])).toEqual({ ok: true, value: [] });
+  });
+});
+
 describe("SkillService.preview", () => {
   afterEach(() => {
     while (openDbs.length > 0) openDbs.pop()?.close();

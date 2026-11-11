@@ -2,7 +2,7 @@
 type Assets = { fetch: (request: Request) => Promise<Response> };
 
 // Hono のアプリ（bootstrap）に渡す道。wrangler.jsonc の run_worker_first で先に Worker を通す。
-const APP_EXACT: ReadonlySet<string> = new Set(["/api"]);
+const APP_EXACT: ReadonlySet<string> = new Set(["/api", "/mcp"]);
 const APP_PREFIXES = ["/api/", "/oauth/", "/.well-known/"] as const;
 
 /** Hono のアプリが受ける道か（それ以外は画面かファイル） */

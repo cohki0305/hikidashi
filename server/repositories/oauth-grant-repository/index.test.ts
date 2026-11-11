@@ -18,6 +18,19 @@ function setup(): { db: SkillDb; repository: OauthGrantRepository } {
   return { db: testDb.db, repository: new OauthGrantRepository(testDb.db) };
 }
 
+function countBatch(db: SkillDb): { calls: number } {
+  const target = db as unknown as {
+    batch: (queries: readonly unknown[]) => Promise<readonly unknown[]>;
+  };
+  const original = target.batch;
+  const counter = { calls: 0 };
+  target.batch = async (queries) => {
+    counter.calls += 1;
+    return original.call(db, queries);
+  };
+  return counter;
+}
+
 async function seedClient(db: SkillDb) {
   await db
     .insert(oauthClients)
@@ -74,6 +87,7 @@ describe("OauthGrantRepository", () => {
     const { db, repository } = setup();
     await seedClient(db);
     await seedGrant(repository, "grant-1", OLD_HASH);
+    const batch = countBatch(db);
 
     const rotated = await repository.rotateRefresh("grant-1", {
       oldHash: OLD_HASH,
@@ -82,6 +96,7 @@ describe("OauthGrantRepository", () => {
       now: NOW
     });
     expect(rotated).toEqual({ ok: true, value: true });
+    expect(batch.calls).toBe(1);
 
     const row = await repository.findById("grant-1");
     expect(row.ok).toBe(true);
@@ -100,6 +115,7 @@ describe("OauthGrantRepository", () => {
     const { db, repository } = setup();
     await seedClient(db);
     await seedGrant(repository, "grant-1", OLD_HASH);
+    const batch = countBatch(db);
 
     const rotated = await repository.rotateRefresh("grant-1", {
       oldHash: "x".repeat(64),
@@ -108,6 +124,7 @@ describe("OauthGrantRepository", () => {
       now: NOW
     });
     expect(rotated).toEqual({ ok: true, value: false });
+    expect(batch.calls).toBe(1);
 
     const row = await repository.findById("grant-1");
     expect(row.ok).toBe(true);

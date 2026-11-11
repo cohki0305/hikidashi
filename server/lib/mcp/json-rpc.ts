@@ -9,10 +9,14 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const MCP_INSTRUCTIONS =
   "hikidashi はチームのスキルの置き場です。Claude Code では、会話の始めに ~/.claude/skills/*/.hikidashi.json を読み、check_skill_updates に渡してください。新しい版があれば、スキルの名前と新しい版を利用者に伝え、同意を得てから入れ直してください。勝手に上書きしないでください。";
 
+/** 名前で引いたスキルの最新版。 */
+export type SkillLatest = { name: string; latestVersion: number; fingerprint: string };
+
 /** ツールが使うスキルの一覧と詳細。 */
 export type SkillCatalog = {
   list(query: string): Promise<Result<SkillSummary[]>>;
   show(name: string): Promise<Result<SkillDetailResponse>>;
+  latestByNames(names: readonly string[]): Promise<Result<SkillLatest[]>>;
 };
 
 /** ツールを呼んだ人のメールアドレスと、スキルを読む口。 */
@@ -23,7 +27,7 @@ export type McpTool<I> = {
   name: string;
   description: string;
   input: z.ZodType<I>;
-  call(ctx: { email: string }, input: I): Promise<Result<unknown>>;
+  call(ctx: McpToolContext, input: I): Promise<Result<unknown>>;
 };
 
 export type ToolDescriptor = {

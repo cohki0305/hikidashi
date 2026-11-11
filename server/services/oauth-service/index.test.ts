@@ -222,11 +222,12 @@ describe("OauthService", () => {
       expect(url.searchParams.get("iss")).toBe(ISSUER);
       expect(must(await service.describeRequest(requestId))).toEqual({
         clientName: "Claude",
+        redirectHost: "claude.ai",
         status: "pending"
       });
     });
 
-    test("期限切れの頼みは describeRequest が expired で、許可もできない", async () => {
+    test("期限切れの頼みは describeRequest が expired で、許可も拒否もできない", async () => {
       const { service, advance } = setup();
       const client = await registerClient(service);
       const requestId = await startRequest(service, client.client_id);
@@ -234,11 +235,14 @@ describe("OauthService", () => {
 
       expect(must(await service.describeRequest(requestId))).toEqual({
         clientName: "Claude",
+        redirectHost: "claude.ai",
         status: "expired"
       });
       expect(await service.approve(requestId, "hanako@example.test")).toMatchObject({
-        ok: false
+        ok: false,
+        kind: "conflict"
       });
+      expect(await service.deny(requestId)).toMatchObject({ ok: false, kind: "conflict" });
     });
 
     test("使い済みの頼みはもう許可できず、describeRequest は expired", async () => {
@@ -247,10 +251,12 @@ describe("OauthService", () => {
       must(await exchange(service, code, clientId));
 
       expect(await service.approve(requestId, "other@example.test")).toMatchObject({
-        ok: false
+        ok: false,
+        kind: "conflict"
       });
       expect(must(await service.describeRequest(requestId))).toEqual({
         clientName: "Claude",
+        redirectHost: "claude.ai",
         status: "expired"
       });
     });
@@ -265,8 +271,10 @@ describe("OauthService", () => {
       expect(url.searchParams.get("state")).toBe("st-1");
       expect(url.searchParams.get("iss")).toBe(ISSUER);
       expect(await service.approve(requestId, "hanako@example.test")).toMatchObject({
-        ok: false
+        ok: false,
+        kind: "conflict"
       });
+      expect(await service.deny(requestId)).toMatchObject({ ok: false, kind: "conflict" });
       expect(must(await service.describeRequest(requestId)).status).toBe("expired");
       expect(await db.select().from(oauthGrants)).toHaveLength(0);
     });

@@ -16,6 +16,13 @@ const FIELDS = [
   "refresh_token"
 ] as const;
 
+/** 入力の誤りだけを 400 にし、DB などの一時的な失敗は 503 にする（RFC 6749）。 */
+function tokenFailure(c: Context, result: { kind: string; message: string }) {
+  return result.kind === "invalid"
+    ? oauthError(c, 400, result.message)
+    : oauthError(c, 503, "temporarily_unavailable");
+}
+
 function tokenResponse(c: Context, tokens: TokenSet) {
   c.header("Cache-Control", "no-store");
   return ok(c, {
@@ -40,7 +47,7 @@ export const create = factory.createHandlers(async (c) => {
       clientId: form.client_id,
       redirectUri: form.redirect_uri
     });
-    return result.ok ? tokenResponse(c, result.value) : oauthError(c, 400, result.message);
+    return result.ok ? tokenResponse(c, result.value) : tokenFailure(c, result);
   }
 
   if (form.grant_type === "refresh_token") {
@@ -49,7 +56,7 @@ export const create = factory.createHandlers(async (c) => {
       refreshToken: form.refresh_token,
       clientId: form.client_id
     });
-    return result.ok ? tokenResponse(c, result.value) : oauthError(c, 400, result.message);
+    return result.ok ? tokenResponse(c, result.value) : tokenFailure(c, result);
   }
 
   return oauthError(c, 400, form.grant_type ? "unsupported_grant_type" : "invalid_request");

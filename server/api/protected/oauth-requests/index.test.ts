@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { OAuthRequestServicePort } from "@/server/api/protected/oauth-requests";
 import { createApp } from "@/server/app";
 import type { AccessVerifier } from "@/server/lib/access/verify-access-jwt";
-import { forbidden, invalid, notFound, ok } from "@/server/lib/result";
+import { conflict, forbidden, notFound, ok } from "@/server/lib/result";
 
 const REQUEST_ID = "11111111-1111-4111-8111-111111111111";
 const ACCESS = { "Cf-Access-Jwt-Assertion": "valid-jwt" };
@@ -13,7 +13,8 @@ const verify: AccessVerifier = async (jwt) =>
 function build(options: { port?: Partial<OAuthRequestServicePort>; withService?: boolean } = {}) {
   const calls: { approve: unknown[]; deny: string[] } = { approve: [], deny: [] };
   const port: OAuthRequestServicePort = {
-    describeRequest: async () => ok({ clientName: "Claude", status: "pending" }),
+    describeRequest: async () =>
+      ok({ clientName: "Claude", redirectHost: "claude.ai", status: "pending" }),
     approve: async (id, email) => {
       calls.approve.push({ id, email });
       return ok({ redirectTo: "https://claude.ai/cb?code=hkd_cd_fake&state=st-1" });
@@ -45,14 +46,25 @@ describe("GET /api/oauth-requests/:id", () => {
     const { app } = build();
     const response = await get(app);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ clientName: "Claude", status: "pending" });
+    expect(await response.json()).toEqual({
+      clientName: "Claude",
+      redirectHost: "claude.ai",
+      status: "pending"
+    });
   });
 
   test("期限切れも状態として返す", async () => {
     const { app } = build({
-      port: { describeRequest: async () => ok({ clientName: "Claude", status: "expired" }) }
+      port: {
+        describeRequest: async () =>
+          ok({ clientName: "Claude", redirectHost: "claude.ai", status: "expired" })
+      }
     });
-    expect(await (await get(app)).json()).toEqual({ clientName: "Claude", status: "expired" });
+    expect(await (await get(app)).json()).toEqual({
+      clientName: "Claude",
+      redirectHost: "claude.ai",
+      status: "expired"
+    });
   });
 
   test("Access の JWT が無い・不正なら 401", async () => {
@@ -97,14 +109,14 @@ describe("POST /api/oauth-requests/:id/approvals", () => {
     expect(calls.approve).toEqual([]);
   });
 
-  test("期限切れの頼みは 400", async () => {
+  test("期限切れの頼みは 409", async () => {
     const { app } = build({
       port: {
         approve: async () =>
-          invalid("この画面は期限が切れました。Claude の画面からもう一度つないでください。")
+          conflict("この画面は期限が切れました。Claude の画面からもう一度つないでください。")
       }
     });
-    expect((await post(app, "approvals")).status).toBe(400);
+    expect((await post(app, "approvals")).status).toBe(409);
   });
 });
 
@@ -117,5 +129,15 @@ describe("POST /api/oauth-requests/:id/denials", () => {
       redirectTo: "https://claude.ai/cb?error=access_denied&state=st-1"
     });
     expect(calls.deny).toEqual([REQUEST_ID]);
+  });
+
+  test("期限切れの頼みは 409", async () => {
+    const { app } = build({
+      port: {
+        deny: async () =>
+          conflict("この画面は期限が切れました。Claude の画面からもう一度つないでください。")
+      }
+    });
+    expect((await post(app, "denials")).status).toBe(409);
   });
 });

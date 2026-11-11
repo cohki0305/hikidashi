@@ -14,9 +14,10 @@ export const create = factory.createHandlers(async (c) => {
     client_name: input.clientName,
     redirect_uris: input.redirectUris
   });
-  if (!result.ok)
-    return result.kind === "rate_limited"
-      ? oauthError(c, 429, "temporarily_unavailable")
-      : oauthError(c, 400, result.message);
+  if (!result.ok) {
+    if (result.kind === "invalid") return oauthError(c, 400, result.message);
+    if (result.kind === "rate_limited") return oauthError(c, 429, "temporarily_unavailable");
+    return oauthError(c, 503, "temporarily_unavailable");
+  }
   return created(c, result.value);
 });

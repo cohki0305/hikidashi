@@ -1,3 +1,4 @@
+import type { SkillLatest } from "@/server/lib/mcp/json-rpc";
 import { notFound, ok, type Result, upstream } from "@/server/lib/result";
 import { openEntryStream, r2RangeSource, readCentralDirectory } from "@/server/lib/zip";
 import type { SkillFileRepository } from "@/server/repositories/skill-file-repository";
@@ -125,6 +126,42 @@ export class SkillService {
         fileCount: version.fileCount
       }))
     });
+  }
+
+  /** 名前の一覧から、スキルと最新版の指紋をまとめて返す。無い名前は含めない。 */
+  async latestByNames(names: readonly string[]): Promise<Result<SkillLatest[]>> {
+    const unique = [...new Set(names)];
+    if (unique.length === 0) return ok([]);
+
+    const skillsResult = await this.deps.skills.findByNames(unique);
+    if (!skillsResult.ok) return skillsResult;
+    if (skillsResult.value.length === 0) return ok([]);
+
+    const versionsResult = await this.deps.versions.listBySkillIds(
+      skillsResult.value.map((skill) => skill.id)
+    );
+    if (!versionsResult.ok) return versionsResult;
+
+    const versionsBySkillId = new Map<string, SkillVersionRow[]>();
+    for (const version of versionsResult.value) {
+      const versions = versionsBySkillId.get(version.skillId) ?? [];
+      versions.push(version);
+      versionsBySkillId.set(version.skillId, versions);
+    }
+
+    const latest: SkillLatest[] = [];
+    for (const skill of skillsResult.value) {
+      const versions = versionsBySkillId.get(skill.id) ?? [];
+      const chosen =
+        versions.find((version) => version.version === skill.latestVersion) ?? versions[0];
+      if (chosen === undefined) continue;
+      latest.push({
+        name: skill.name,
+        latestVersion: chosen.version,
+        fingerprint: chosen.fingerprint
+      });
+    }
+    return ok(latest);
   }
 
   /** 版のテキストファイルを、zip の範囲読み出しで返す。 */

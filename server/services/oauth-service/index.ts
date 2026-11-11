@@ -2,7 +2,7 @@ import type { SkillDb } from "@/server/db";
 import { isCodeChallenge, verifyS256 } from "@/server/lib/oauth/pkce";
 import { redirectWith } from "@/server/lib/oauth/redirect-uri";
 import { generateToken, hashToken } from "@/server/lib/oauth/token";
-import { invalid, notFound, ok, type Result } from "@/server/lib/result";
+import { conflict, invalid, notFound, ok, type Result } from "@/server/lib/result";
 import type { OauthAccessTokenRepository } from "@/server/repositories/oauth-access-token-repository";
 import type { OauthClientRepository } from "@/server/repositories/oauth-client-repository";
 import type { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
@@ -109,12 +109,16 @@ export class OauthService {
     if (!client.ok) return client;
     if (!client.value) return notFound(REQUEST_NOT_FOUND_MESSAGE);
 
+    const redirect = URL.canParse(request.value.redirectUri)
+      ? new URL(request.value.redirectUri)
+      : null;
     const finished =
       request.value.expiresAt <= this.now().toISOString() ||
       request.value.usedAt !== null ||
       request.value.deniedAt !== null;
     return ok({
       clientName: client.value.clientName,
+      redirectHost: redirect?.host ?? "",
       status: finished ? "expired" : "pending"
     });
   }
@@ -124,13 +128,13 @@ export class OauthService {
     const request = await this.deps.requests.findById(requestId);
     if (!request.ok) return request;
     if (!request.value) return notFound(REQUEST_NOT_FOUND_MESSAGE);
-    if (request.value.expiresAt <= now.toISOString()) return invalid(EXPIRED_MESSAGE);
+    if (request.value.expiresAt <= now.toISOString()) return conflict(EXPIRED_MESSAGE);
     if (
       request.value.email !== null ||
       request.value.usedAt !== null ||
       request.value.deniedAt !== null
     )
-      return invalid(ALREADY_HANDLED_MESSAGE);
+      return conflict(ALREADY_HANDLED_MESSAGE);
 
     const code = generateToken("code");
     const approved = await this.deps.requests.approve(
@@ -139,7 +143,7 @@ export class OauthService {
       now.toISOString()
     );
     if (!approved.ok) return approved;
-    if (!approved.value) return invalid(EXPIRED_MESSAGE);
+    if (!approved.value) return conflict(EXPIRED_MESSAGE);
 
     return ok({
       redirectTo: this.back(request.value.redirectUri, {
@@ -159,8 +163,8 @@ export class OauthService {
     if (!request.value) return notFound(REQUEST_NOT_FOUND_MESSAGE);
     if (!denied.value) {
       return request.value.expiresAt <= now.toISOString()
-        ? notFound(REQUEST_NOT_FOUND_MESSAGE)
-        : invalid(ALREADY_HANDLED_MESSAGE);
+        ? conflict(EXPIRED_MESSAGE)
+        : conflict(ALREADY_HANDLED_MESSAGE);
     }
 
     return ok({
