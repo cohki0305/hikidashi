@@ -62,6 +62,6 @@ export const f = () => ({ ok: false, kind: "invalid", message: "x" });`
     expect(hit("server/services/a-service/index.ts")).toBe(true);
     expect(hit("server/lib/http.ts")).toBe(true);
     expect(hit("server/api/x.ts")).toBe(false);
-    expect(FILE_RULE.optional).toBe(true);
+    expect(FILE_RULE.optional).toBeUndefined();
   });
 });

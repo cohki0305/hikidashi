@@ -28,7 +28,6 @@ export const RUNNER_FIX =
   "Fix: 横断ユーティリティだけ lib 直下に置く。ドメイン固有は lib/{domain}/、ブラウザ副作用は app/lib/browser/ へ";
 export const FILE_RULE: FileRule = {
   include: ROOT_RE,
-  optional: true,
   check: (file) => findLibLayoutViolations(file)
 };
 

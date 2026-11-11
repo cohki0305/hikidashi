@@ -128,7 +128,6 @@ export const FILE_RULE: FileRule = {
   include: /^server\/api\/.*\.tsx?$/,
   exclude: /\.test\.tsx?$/,
   ast: true,
-  optional: true,
   check: (file, source, ast) => findApiContractViolations(file, source, ast)
 };
 

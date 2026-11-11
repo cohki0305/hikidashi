@@ -131,14 +131,10 @@ test("server/ の違反ファイルで失敗する", async () => {
   const root = fixture(
     'import { sample } from "@/tests/fixtures/sample";\nexport const x = sample;'
   );
-  const original = console.error;
-  console.error = () => {};
-  try {
-    // ルールが 1 本もない Task 2 では通ってしまい、Task 3 で登録されてから失敗する。
-    await runLintCli([], { cwd: root });
-    expect(process.exitCode).not.toBe(0);
-  } finally {
-    console.error = original;
-    process.exitCode = 0;
-  }
+  // package.json が無いと lint:docs-refs が ENOENT で失敗し、違反を検出しなくても緑になる。
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: {} }));
+  // ルールが 1 本もない Task 2 では通ってしまい、Task 3 で登録されてから失敗する。
+  const error = await runLintRunner([], root).catch((e) => e);
+  expect(error.message).toContain("lint:no-fixture-runtime-import");
+  expect(error.message).toContain("server/a.ts");
 }, 30_000);

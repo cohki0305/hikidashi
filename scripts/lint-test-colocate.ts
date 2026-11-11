@@ -35,26 +35,6 @@ const SCOPE_RE = /^(app|server|shared|scripts)\/.+\.tsx?$/;
 /** missing-test を免除する規則。種類を増やさず、1 件ずつ理由を書く。 */
 export const MISSING_TEST_EXEMPT: readonly { pattern: RegExp; reason: string }[] = [
   { pattern: /(^|\/)types\.ts$/, reason: "型だけのファイル（実行される文が無い）" },
-  ...[
-    "server/api/protected/departments/context.ts",
-    "server/api/protected/members/context.ts",
-    "server/api/protected/invitations/context.ts",
-    "server/api/protected/me-records/context.ts",
-    "server/api/protected/me/context.ts",
-    "server/api/protected/operator-companies/context.ts",
-    "server/api/protected/operator-demo-requests/context.ts",
-    "server/api/public/demo-requests/context.ts",
-    "server/api/protected/operator-contact-inquiries/context.ts",
-    "server/api/public/contact-inquiries/context.ts",
-    "server/api/protected/company-adoptions/context.ts",
-    "server/api/protected/setup-progress/context.ts",
-    "server/api/protected/company-insights/context.ts",
-    "server/api/protected/company-settings/context.ts",
-    "server/services/member-service/hooks.ts"
-  ].map((file) => ({
-    pattern: new RegExp(`^${file.replaceAll(".", "\\.")}$`),
-    reason: "型だけのファイル（実行される文が無い）"
-  })),
   { pattern: /\.d\.ts$/, reason: "型宣言だけのファイル（実行される文が無い）" },
   { pattern: /^app\/main\.tsx$/, reason: "起動の入口" },
   { pattern: /^server\/entry\/[^/]+\.ts$/, reason: "起動の入口" },
@@ -68,15 +48,6 @@ export const MISSING_TEST_EXEMPT: readonly { pattern: RegExp; reason: string }[]
 
 /** missing-implementation を免除するテスト。実装がファイルでないものだけを、理由付きで入れる。 */
 export const MISSING_IMPLEMENTATION_ALLOW: readonly { file: string; reason: string }[] = [
-  { file: "app/styles/tokens.test.ts", reason: "実装は CSS（tokens.css）で、.ts / .tsx ではない" },
-  {
-    file: "shared/masking/dom/fields.perf.test.ts",
-    reason: "実装 1 つのテストではなく、anchor・fields をまたぐ速さの計測"
-  },
-  {
-    file: "scripts/worktree-setup.test.ts",
-    reason: "実装はシェルスクリプト（worktree-setup.sh）で、.ts / .tsx ではない"
-  },
   {
     file: "scripts/lint-deps.test.ts",
     reason: "実装は dependency-cruiser の設定全体で、1 つの .ts ではない"
@@ -125,7 +96,6 @@ export const RUNNER_FIX =
   "Fix: テストは対象の隣へ置く。handlers・services・repositories・hooks は {name}/index.ts と隣の index.test.ts にする";
 export const testColocateRule = (files: readonly string[]): FileRule => ({
   include: (file) => /^tests\/.*\.test\.tsx?$/.test(file) || SCOPE_RE.test(file),
-  optional: true,
   check: (file) => findTestColocateViolations(file, files)
 });
 

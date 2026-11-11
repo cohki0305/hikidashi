@@ -47,7 +47,6 @@ export const FILE_RULE: FileRule = {
   include: /^app\/.*\.tsx?$/,
   exclude: TEST_RE,
   ast: true,
-  optional: true,
   check: findBoundaryViolations
 };
 

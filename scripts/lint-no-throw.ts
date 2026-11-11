@@ -29,7 +29,6 @@ export const FILE_RULE: FileRule = {
   include: /^server\/(services|lib)\/.*\.tsx?$/,
   exclude: /\.test\.tsx?$/,
   ast: true,
-  optional: true,
   check: (file, source) => findNoThrowViolations(file, source)
 };
 

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { fileRule, LINT_REGISTRY, projectRule } from "@/scripts/lib/lint-registry";
-import type { FileRule } from "@/scripts/lib/lint-runner-engine";
+import { type FileRule, runFileRules } from "@/scripts/lib/lint-runner-engine";
+import { listLintFiles } from "@/scripts/lint-runner";
 
 describe("LINT_REGISTRY", () => {
   test("ルール名は重複せず、lint: で始まる", () => {
@@ -15,6 +17,26 @@ describe("LINT_REGISTRY", () => {
       expect(existsSync(rule.file)).toBe(true);
       expect(rule.fix.length).toBeGreaterThan(0);
     }
+  });
+
+  test("実リポジトリで必須ルールの対象が 0 件にならない", () => {
+    const cwd = process.cwd();
+    const files = listLintFiles(cwd);
+    const read = (file: string) => readFileSync(path.join(cwd, file), "utf8");
+    const context = { cwd, files, read };
+    const checks = LINT_REGISTRY.flatMap((rule) =>
+      (rule.create(context).checks ?? []).map((check) => ({ rule, check }))
+    );
+    const { findings } = runFileRules(
+      files,
+      checks.map(({ check }) => check),
+      read,
+      { names: checks.map(({ rule }) => rule.name) }
+    );
+    const empty = findings
+      .map(({ violation }) => violation as { file?: string })
+      .filter((violation) => violation.file === "(対象なし)");
+    expect(empty).toEqual([]);
   });
 });
 

@@ -542,8 +542,8 @@ describe("対象", () => {
     ).toEqual([]);
   });
 
-  test("FILE_RULE は server/api の対象 0 件でも落とさず、ランナーで検出できる", () => {
-    expect(FILE_RULE.optional).toBe(true);
+  test("FILE_RULE は必須ルールで、ランナーで検出できる", () => {
+    expect(FILE_RULE.optional).toBeUndefined();
     const result = runFileRules(
       ["server/api/protected/me.ts"],
       [FILE_RULE],

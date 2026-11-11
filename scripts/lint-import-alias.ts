@@ -82,7 +82,6 @@ export const FILE_RULE: FileRule = {
   include: TARGET_RE,
   exclude: IGNORE_RE,
   ast: true,
-  optional: true,
   check: findImportAliasViolations
 };
 

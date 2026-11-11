@@ -51,7 +51,6 @@ export const FILE_RULE: FileRule = {
   include: /^(app|server|shared)\/.*\.tsx?$/,
   exclude: TEST_RE,
   ast: true,
-  optional: true,
   check: findFixtureImportViolations
 };
 

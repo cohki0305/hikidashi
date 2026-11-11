@@ -124,7 +124,6 @@ export const FILE_RULE: FileRule = {
   include: TARGET_RE,
   exclude: /\.test\.tsx?$/,
   ast: true,
-  optional: true,
   check: (file, source) => findSchemaLocationViolations(file, source)
 };
 

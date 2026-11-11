@@ -619,7 +619,6 @@ export const RUNNER_FIX = [
 export const FILE_RULE: FileRule = {
   include: /^server\/.*\.tsx?$/,
   exclude: /\.test\.tsx?$/,
-  optional: true,
   check: (file, source) => findHonoStyleViolations(file, source)
 };
 

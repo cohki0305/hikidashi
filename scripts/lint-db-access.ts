@@ -174,7 +174,6 @@ export const FILE_RULE: FileRule = {
   include: /^server\/.*\.tsx?$/,
   exclude: /\.test\.tsx?$/,
   ast: true,
-  optional: true,
   check: (file, source) => findDbAccessViolations(file, source)
 };
 
