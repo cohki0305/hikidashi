@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "@/server/app";
 import type { AccessVerifier } from "@/server/lib/access/verify-access-jwt";
-import { forbidden, notFound, ok } from "@/server/lib/result";
+import { forbidden, invalid, notFound, ok, upstream } from "@/server/lib/result";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 import type { SkillServicePort } from "./context";
 
@@ -38,18 +38,9 @@ type ServiceCall =
   | { method: "list"; query: string }
   | { method: "show"; name: string }
   | { method: "preview"; name: string; version: number; path: string }
-  | { method: "download"; name: string; version: number };
+  | { method: "installInfo"; name: string; version: number };
 
-function streamOf(text: string): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode(text));
-      controller.close();
-    }
-  });
-}
-
-function fakeService() {
+function fakeService(options: { missingConfig?: boolean; invalidInput?: boolean } = {}) {
   const calls: ServiceCall[] = [];
   const service: SkillServicePort = {
     list: async (query) => {
@@ -66,14 +57,22 @@ function fakeService() {
         return notFound("プレビューできるファイルではありません");
       return ok("# 見本のスキル\n");
     },
-    download: async (name, version) => {
-      calls.push({ method: "download", name, version });
+    installInfo: async (name, version = summary.latestVersion) => {
+      calls.push({ method: "installInfo", name, version });
+      if (options.missingConfig)
+        return upstream("R2 の S3 の設定が足りません", { missingConfig: true });
+      if (options.invalidInput) return invalid("入力が正しくありません");
       if (name !== summary.name || version !== summary.latestVersion)
         return notFound("スキルの版が見つかりません");
       return ok({
-        body: streamOf("zip-bytes"),
-        size: 9,
-        filename: `${name}-v${version}.zip`
+        name,
+        version,
+        fingerprint: "abc123",
+        sizeBytes: 2048,
+        claudeCodeOnly: false,
+        downloadUrl:
+          "https://signed.example/team-skill-v2.zip?X-Amz-Expires=600&X-Amz-Signature=abc",
+        expiresInSeconds: 600
       });
     }
   };
@@ -175,20 +174,42 @@ describe("GET /api/skills/:skillName/versions/:version/files", () => {
 });
 
 describe("GET /api/skills/:skillName/versions/:version/download", () => {
-  test("zip の Content-Type と Content-Disposition を返す", async () => {
+  test("署名付き URL へ 302 でリダイレクトし、zip を Worker で流さない", async () => {
     const { service, calls } = fakeService();
 
     const response = await buildApp(service).request("/api/skills/team-skill/versions/2/download", {
       headers: AUTH_HEADER
     });
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("application/zip");
-    expect(response.headers.get("content-disposition")).toBe(
-      'attachment; filename="team-skill-v2.zip"'
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "https://signed.example/team-skill-v2.zip?X-Amz-Expires=600&X-Amz-Signature=abc"
     );
-    expect(await response.text()).toBe("zip-bytes");
-    expect(calls).toEqual([{ method: "download", name: "team-skill", version: 2 }]);
+    expect(response.headers.get("content-type")).not.toBe("application/zip");
+    expect(await response.text()).toBe("");
+    expect(calls).toEqual([{ method: "installInfo", name: "team-skill", version: 2 }]);
+  });
+
+  test("S3 の設定が欠けているときは 503", async () => {
+    const { service } = fakeService({ missingConfig: true });
+
+    const response = await buildApp(service).request("/api/skills/team-skill/versions/2/download", {
+      headers: AUTH_HEADER
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ kind: "upstream" });
+  });
+
+  test("設定不足以外の invalid は 503 にせず 400", async () => {
+    const { service } = fakeService({ invalidInput: true });
+
+    const response = await buildApp(service).request("/api/skills/team-skill/versions/2/download", {
+      headers: AUTH_HEADER
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ kind: "invalid" });
   });
 
   test("版が数字でない・0・最新より大きいときは 404", async () => {

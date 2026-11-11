@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-/** AI のサービスが自分で登録する連携の窓口。登録は誰でもできるので、社員には結ばない。 */
+/** AI のサービスが自分で登録する連携の窓口。登録は誰でもできるので、メンバーには結ばない。 */
 export const oauthClients = sqliteTable(
   "oauth_clients",
   {
@@ -37,7 +37,7 @@ export const oauthRequests = sqliteTable(
   (table) => [index("oauth_requests_expires_at_idx").on(table.expiresAt)]
 );
 
-/** 社員が AI につなぐことを許した 1 件。取り消すと、その grant のトークンはすべて使えなくなる。 */
+/** メンバーが Claude につなぐことを許した 1 件。取り消すと、その grant のトークンはすべて使えなくなる。 */
 export const oauthGrants = sqliteTable(
   "oauth_grants",
   {

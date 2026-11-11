@@ -9,6 +9,9 @@ const MAX_NAMES_PER_QUERY = 100;
 /** skills テーブルの 1 行。 */
 export type SkillRow = typeof skills.$inferSelect;
 
+/** batch にまとめる書き込み 1 文。 */
+type BatchStatement = { execute: () => Promise<unknown> };
+
 /** D1 の束縛からスキル API が使う DB ハンドルを作る。 */
 export function createSkillDb(d1: D1Database): SkillDb {
   return createDb(d1);
@@ -56,5 +59,18 @@ export class SkillRepository {
     } catch {
       return upstream("スキルを読めませんでした");
     }
+  }
+
+  /** 新しいスキルを作る文。 */
+  insertStatement(row: SkillRow): BatchStatement {
+    return this.db.insert(skills).values(row);
+  }
+
+  /** スキルの表示と最新版を更新する文。 */
+  updateStatement(
+    id: string,
+    fields: Pick<SkillRow, "title" | "description" | "latestVersion" | "updatedAt">
+  ): BatchStatement {
+    return this.db.update(skills).set(fields).where(eq(skills.id, id));
   }
 }

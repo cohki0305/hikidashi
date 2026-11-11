@@ -13,7 +13,7 @@ const TOUCH_INTERVAL_MS = 5 * 60_000;
 /** D1 の DB は batch を持つが、テストの bun:sqlite は持たない。 */
 type BatchCapableDb = { batch?: (queries: readonly unknown[]) => Promise<readonly unknown[]> };
 
-/** 社員が AI につなぐことを許した 1 件の読み書き。 */
+/** メンバーが Claude につなぐことを許した 1 件の読み書き。 */
 export class OauthGrantRepository {
   constructor(private readonly db: SkillDb) {}
 

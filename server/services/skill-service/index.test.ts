@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
+import { skills, skillVersions } from "@/server/db/schema";
+import type { R2S3Config } from "@/server/lib/r2/presign";
 import { SkillFileRepository } from "@/server/repositories/skill-file-repository";
 import { SkillRepository } from "@/server/repositories/skill-repository";
 import { SkillVersionRepository } from "@/server/repositories/skill-version-repository";
@@ -9,6 +12,13 @@ import { PREVIEW_MAX_BYTES, SkillService } from "./index";
 
 const openDbs: TestDb[] = [];
 
+const S3_CONFIG: R2S3Config = {
+  accountId: "test-account",
+  accessKeyId: "test-access-key",
+  secretAccessKey: "test-secret-key",
+  bucket: "hikidashi-skills"
+};
+
 function setup(claudeAiMaxBytes?: number) {
   const testDb = createTestDb();
   openDbs.push(testDb);
@@ -17,13 +27,19 @@ function setup(claudeAiMaxBytes?: number) {
   return { testDb, fake, service };
 }
 
-function makeService(testDb: TestDb, bucket: R2Bucket, claudeAiMaxBytes?: number) {
+function makeService(
+  testDb: TestDb,
+  bucket: R2Bucket,
+  claudeAiMaxBytes?: number,
+  s3: R2S3Config | null = S3_CONFIG
+) {
   return new SkillService({
     skills: new SkillRepository(testDb.db),
     versions: new SkillVersionRepository(testDb.db),
     files: new SkillFileRepository(testDb.db),
     bucket,
-    claudeAiMaxBytes
+    claudeAiMaxBytes,
+    s3: s3 ?? undefined
   });
 }
 
@@ -323,38 +339,175 @@ describe("SkillService.preview", () => {
   });
 });
 
-describe("SkillService.download", () => {
+describe("SkillService.list・show の最新版", () => {
   afterEach(() => {
     while (openDbs.length > 0) openDbs.pop()?.close();
   });
 
-  test("R2 の stream をそのまま返す", async () => {
+  test("latest_version が最大番号でなくても、一覧と詳細は同じ版を指す", async () => {
     const { testDb, fake, service } = setup();
-    await seedSkill(testDb.db, fake.bucket, {
+    const { skillId } = await seedSkill(testDb.db, fake.bucket, {
       name: "alpha",
       title: "アルファ",
-      files: TEXT_FILES
+      files: TEXT_FILES,
+      versions: 2
+    });
+    await testDb.db.update(skills).set({ latestVersion: 1 }).where(eq(skills.id, skillId)).run();
+    await testDb.db
+      .update(skillVersions)
+      .set({ sizeBytes: 999_999 })
+      .where(eq(skillVersions.version, 2))
+      .run();
+    const versionOne = await testDb.db
+      .select()
+      .from(skillVersions)
+      .where(eq(skillVersions.version, 1))
+      .get();
+    if (!versionOne) throw new Error("版 1 がありません");
+
+    const list = await service.list("");
+    expect(list.ok).toBe(true);
+    if (!list.ok) return;
+    expect(list.value[0]).toMatchObject({
+      name: "alpha",
+      latestVersion: 1,
+      sizeBytes: versionOne.sizeBytes
     });
 
-    const downloaded = await service.download("alpha", 1);
-    expect(downloaded.ok).toBe(true);
-    if (!downloaded.ok) return;
-    expect(downloaded.value.filename).toBe("alpha-v1.zip");
-    expect(downloaded.value.size).toBeGreaterThan(0);
-    const expectedBody = fake.lastBody;
-    if (expectedBody === null) throw new Error("偽の R2 が body を返していません");
-    expect(downloaded.value.body).toBe(expectedBody);
+    const detail = await service.show("alpha");
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) return;
+    expect(detail.value.skill).toMatchObject({
+      latestVersion: 1,
+      sizeBytes: versionOne.sizeBytes
+    });
+    expect(detail.value.versions.map((version) => version.version)).toEqual([2, 1]);
+  });
+});
+
+describe("SkillService.installInfo", () => {
+  afterEach(() => {
+    while (openDbs.length > 0) openDbs.pop()?.close();
   });
 
-  test("無い名前・無い版は notFound", async () => {
+  test("最新版の 600 秒有効の署名付きダウンロード URL を返す", async () => {
+    const { testDb, fake, service } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES,
+      versions: 2
+    });
+    const latest = await testDb.db
+      .select()
+      .from(skillVersions)
+      .where(eq(skillVersions.version, 2))
+      .get();
+    if (!latest) throw new Error("版 2 がありません");
+
+    const result = await service.installInfo("alpha");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toMatchObject({
+      name: "alpha",
+      version: 2,
+      fingerprint: latest.fingerprint,
+      sizeBytes: latest.sizeBytes,
+      claudeCodeOnly: false,
+      expiresInSeconds: 600
+    });
+    const url = new URL(result.value.downloadUrl);
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("600");
+    expect(decodeURIComponent(url.pathname)).toBe(`/hikidashi-skills/${latest.r2Key}`);
+  });
+
+  test("latest_version が最大番号でなくても、その版の URL を返す", async () => {
+    const { testDb, fake, service } = setup();
+    const { skillId } = await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES,
+      versions: 2
+    });
+    await testDb.db.update(skills).set({ latestVersion: 1 }).where(eq(skills.id, skillId)).run();
+    const versionOne = await testDb.db
+      .select()
+      .from(skillVersions)
+      .where(eq(skillVersions.version, 1))
+      .get();
+    if (!versionOne) throw new Error("版 1 がありません");
+
+    const result = await service.installInfo("alpha");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toMatchObject({
+      version: 1,
+      fingerprint: versionOne.fingerprint,
+      sizeBytes: versionOne.sizeBytes
+    });
+  });
+
+  test("版を指定すると、その版の URL を返す", async () => {
+    const { testDb, fake, service } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES,
+      versions: 2
+    });
+    const versionOne = await testDb.db
+      .select()
+      .from(skillVersions)
+      .where(eq(skillVersions.version, 1))
+      .get();
+    if (!versionOne) throw new Error("版 1 がありません");
+
+    const result = await service.installInfo("alpha", 1);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.version).toBe(1);
+    expect(decodeURIComponent(new URL(result.value.downloadUrl).pathname)).toBe(
+      `/hikidashi-skills/${versionOne.r2Key}`
+    );
+    expect(await service.installInfo("alpha", 9)).toMatchObject({
+      ok: false,
+      kind: "not_found"
+    });
+  });
+
+  test("無い名前は notFound、S3 の設定が無ければ missingConfig 付きの upstream", async () => {
     const { testDb, fake, service } = setup();
     await seedSkill(testDb.db, fake.bucket, {
       name: "alpha",
       title: "アルファ",
       files: TEXT_FILES
     });
+    const withoutS3 = makeService(testDb, fake.bucket, undefined, null);
 
-    expect(await service.download("missing", 1)).toMatchObject({ ok: false, kind: "not_found" });
-    expect(await service.download("alpha", 9)).toMatchObject({ ok: false, kind: "not_found" });
+    expect(await service.installInfo("missing")).toMatchObject({ ok: false, kind: "not_found" });
+    expect(await withoutS3.installInfo("alpha")).toMatchObject({
+      ok: false,
+      kind: "upstream",
+      details: { missingConfig: true }
+    });
+  });
+
+  test("claude.ai の上限を超える版は claudeCodeOnly にする", async () => {
+    const { testDb, fake } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES
+    });
+    const limited = makeService(testDb, fake.bucket, 1);
+
+    const result = await limited.installInfo("alpha");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.claudeCodeOnly).toBe(true);
   });
 });

@@ -9,10 +9,20 @@ export type SkillServicePort = {
   list(query: string): Promise<Result<SkillSummary[]>>;
   show(name: string): Promise<Result<SkillDetailResponse>>;
   preview(name: string, version: number, path: string): Promise<Result<string>>;
-  download(
+  installInfo(
     name: string,
-    version: number
-  ): Promise<Result<{ body: ReadableStream; size: number; filename: string }>>;
+    version?: number
+  ): Promise<
+    Result<{
+      name: string;
+      version: number;
+      fingerprint: string;
+      sizeBytes: number;
+      claudeCodeOnly: boolean;
+      downloadUrl: string;
+      expiresInSeconds: 600;
+    }>
+  >;
 };
 
 export type SkillsEnv = { Variables: { skillService: SkillServicePort } };

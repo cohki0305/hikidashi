@@ -3,3 +3,8 @@
 # 本番では APP_ENV を設定しない（Cloudflare Access の JWT を検証する）。
 APP_ENV=development
 DEV_ACCESS_EMAIL=dev@example.com
+
+# R2 の S3 互換 API に署名するためのキー。Cloudflare のダッシュボードで発行した値を入れる。
+# R2_ACCOUNT_ID・R2_BUCKET_NAME は wrangler.jsonc の vars にある（ここには書かない）。
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
