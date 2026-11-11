@@ -198,6 +198,51 @@ describe("SkillService.show", () => {
   });
 });
 
+describe("SkillService.latestByNames", () => {
+  afterEach(() => {
+    while (openDbs.length > 0) openDbs.pop()?.close();
+  });
+
+  test("名前の一覧から最新版の指紋をまとめて返し、無い名前は含めない", async () => {
+    const { testDb, fake, service } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: TEXT_FILES,
+      versions: 2
+    });
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "beta",
+      title: "ベータ",
+      files: TEXT_FILES
+    });
+
+    const alpha = await service.show("alpha");
+    expect(alpha.ok).toBe(true);
+    if (!alpha.ok) return;
+    const beta = await service.show("beta");
+    expect(beta.ok).toBe(true);
+    if (!beta.ok) return;
+
+    const latest = await service.latestByNames(["alpha", "beta", "missing"]);
+    expect(latest.ok).toBe(true);
+    if (!latest.ok) return;
+    expect([...latest.value].sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+      {
+        name: "alpha",
+        latestVersion: 2,
+        fingerprint: alpha.value.versions[0]?.fingerprint
+      },
+      {
+        name: "beta",
+        latestVersion: 1,
+        fingerprint: beta.value.versions[0]?.fingerprint
+      }
+    ]);
+    expect(await service.latestByNames([])).toEqual({ ok: true, value: [] });
+  });
+});
+
 describe("SkillService.preview", () => {
   afterEach(() => {
     while (openDbs.length > 0) openDbs.pop()?.close();
@@ -291,42 +336,6 @@ describe("SkillService.preview", () => {
       ok: false,
       kind: "not_found"
     });
-  });
-});
-
-describe("SkillService.download", () => {
-  afterEach(() => {
-    while (openDbs.length > 0) openDbs.pop()?.close();
-  });
-
-  test("R2 の stream をそのまま返す", async () => {
-    const { testDb, fake, service } = setup();
-    await seedSkill(testDb.db, fake.bucket, {
-      name: "alpha",
-      title: "アルファ",
-      files: TEXT_FILES
-    });
-
-    const downloaded = await service.download("alpha", 1);
-    expect(downloaded.ok).toBe(true);
-    if (!downloaded.ok) return;
-    expect(downloaded.value.filename).toBe("alpha-v1.zip");
-    expect(downloaded.value.size).toBeGreaterThan(0);
-    const expectedBody = fake.lastBody;
-    if (expectedBody === null) throw new Error("偽の R2 が body を返していません");
-    expect(downloaded.value.body).toBe(expectedBody);
-  });
-
-  test("無い名前・無い版は notFound", async () => {
-    const { testDb, fake, service } = setup();
-    await seedSkill(testDb.db, fake.bucket, {
-      name: "alpha",
-      title: "アルファ",
-      files: TEXT_FILES
-    });
-
-    expect(await service.download("missing", 1)).toMatchObject({ ok: false, kind: "not_found" });
-    expect(await service.download("alpha", 9)).toMatchObject({ ok: false, kind: "not_found" });
   });
 });
 

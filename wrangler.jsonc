@@ -7,6 +7,8 @@
   "vars": {
     "ACCESS_TEAM_DOMAIN": "https://hikidashi.cloudflareaccess.com",
     "ACCESS_AUD": "<あとで設定する>",
+    // OAuth と MCP の入口が名乗る自分の URL。未設定ならそれらの入口は載せない（404）。
+    "APP_URL": "<あとで設定する>",
     // R2 の S3 互換 API の署名に使う。キー（R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）は Worker のシークレット。
     "R2_ACCOUNT_ID": "<あとで設定する>",
     "R2_BUCKET_NAME": "hikidashi-skills"

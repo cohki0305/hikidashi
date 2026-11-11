@@ -54,4 +54,16 @@ describe("SkillRepository", () => {
     const missing = await repository.findByName("missing");
     expect(missing).toEqual({ ok: true, value: null });
   });
+
+  test("複数の名前をまとめて引き、無い名前は含めない", async () => {
+    const { db, repository } = setup();
+    await insertSkill(db, "skill-1", "alpha", "2026-01-01T00:00:00.000Z").run();
+    await insertSkill(db, "skill-2", "beta", "2026-02-01T00:00:00.000Z").run();
+
+    const result = await repository.findByNames(["alpha", "beta", "missing"]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.map((skill) => skill.name).sort()).toEqual(["alpha", "beta"]);
+    expect(await repository.findByNames([])).toEqual({ ok: true, value: [] });
+  });
 });

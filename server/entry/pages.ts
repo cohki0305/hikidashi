@@ -2,16 +2,16 @@
 type Assets = { fetch: (request: Request) => Promise<Response> };
 
 // Hono のアプリ（bootstrap）に渡す道。wrangler.jsonc の run_worker_first で先に Worker を通す。
-const APP_EXACT: ReadonlySet<string> = new Set(["/api"]);
-const APP_PREFIXES = ["/api/"] as const;
+const APP_EXACT: ReadonlySet<string> = new Set(["/api", "/mcp"]);
+const APP_PREFIXES = ["/api/", "/oauth/", "/.well-known/"] as const;
 
 /** Hono のアプリが受ける道か（それ以外は画面かファイル） */
 export function isAppPath(pathname: string): boolean {
   return APP_EXACT.has(pathname) || APP_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-// 画面のある道。いまはトップだけ。
-const PAGE_PATHS: ReadonlySet<string> = new Set(["/"]);
+// 画面のある道。許可の画面は OAuth の頼みを受けて開く。
+const PAGE_PATHS: ReadonlySet<string> = new Set(["/", "/authorize"]);
 
 function isPagePath(pathname: string): boolean {
   return PAGE_PATHS.has(pathname);

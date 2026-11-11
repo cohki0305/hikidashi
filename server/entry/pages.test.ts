@@ -27,6 +27,12 @@ describe("servePage", () => {
     expect(await response.text()).toBe(INDEX);
   });
 
+  test("許可の画面は 200 で画面を返す", async () => {
+    const response = await servePage(get("/authorize"), fakeAssets());
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(INDEX);
+  });
+
   test("画面の無い道は 404 で同じ画面を返す", async () => {
     const response = await servePage(get("/nope"), fakeAssets());
     expect(response.status).toBe(404);
@@ -56,8 +62,19 @@ describe("servePage", () => {
 });
 
 describe("isAppPath", () => {
-  test("API の道だけ true", () => {
-    for (const path of ["/api", "/api/health"]) expect(isAppPath(path)).toBe(true);
-    for (const path of ["/", "/apis", "/nope"]) expect(isAppPath(path)).toBe(false);
+  test("API と OAuth の道は true", () => {
+    for (const path of [
+      "/api",
+      "/api/health",
+      "/mcp",
+      "/oauth/authorize",
+      "/oauth/token",
+      "/.well-known/oauth-authorization-server"
+    ])
+      expect(isAppPath(path)).toBe(true);
+  });
+
+  test("画面とファイルの道は false", () => {
+    for (const path of ["/", "/authorize", "/apis", "/nope"]) expect(isAppPath(path)).toBe(false);
   });
 });
