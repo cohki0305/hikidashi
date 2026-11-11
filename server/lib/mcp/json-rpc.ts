@@ -1,6 +1,9 @@
 import type { z } from "zod";
 import type { Result } from "@/server/lib/result";
+import type { FinishPublishResult, InstallInfo, PublishTicket } from "@/shared/schemas/mcp";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
+
+export type { FinishPublishResult, InstallInfo, PublishTicket };
 
 /** 相手が版を名乗らなかったときに返す、こちらの既定の版。 */
 export const PROTOCOL_VERSION = "2025-06-18";
@@ -22,37 +25,6 @@ export type SkillCatalog = {
   latestByNames(names: readonly string[]): Promise<Result<SkillLatest[]>>;
 };
 
-/** 入れるスキルの版と、ダウンロードに使う情報。 */
-export type InstallInfo = {
-  name: string;
-  version: number;
-  fingerprint: string;
-  sizeBytes: number;
-  claudeCodeOnly: boolean;
-  downloadUrl: string;
-  expiresInSeconds: number;
-};
-
-/** 公開の受け皿。 */
-export type PublishTicket = {
-  uploadId: string;
-  uploadUrl: string;
-  expiresAt: string;
-  maxBytes: number;
-};
-
-/** 公開の結果。公開できたときだけ新しい指紋を返す。 */
-export type PublishResult =
-  | {
-      status: "published";
-      name: string;
-      version: number;
-      fingerprint: string;
-      fileCount: number;
-      sizeBytes: number;
-    }
-  | { status: "unchanged"; name: string; version: number };
-
 /** スキルを手元に入れるための口。 */
 export type InstallPort = {
   installInfo(name: string, version?: number): Promise<Result<InstallInfo>>;
@@ -61,7 +33,7 @@ export type InstallPort = {
 /** スキルを公開するための口。 */
 export type PublishPort = {
   begin(email: string): Promise<Result<PublishTicket>>;
-  finish(email: string, uploadId: string, note?: string): Promise<Result<PublishResult>>;
+  finish(email: string, uploadId: string, note?: string): Promise<Result<FinishPublishResult>>;
 };
 
 /** ツールを呼んだ人のメールアドレスと、スキルを読む・入れる・公開する口。 */

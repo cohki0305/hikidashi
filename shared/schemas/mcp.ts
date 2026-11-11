@@ -38,3 +38,42 @@ export const finishPublishInputSchema = z.object({
   note: z.string().max(500).optional()
 });
 export type FinishPublishInput = z.infer<typeof finishPublishInputSchema>;
+
+/** install_skill が返す、入れるスキルの版とダウンロード先。 */
+export const installInfoSchema = z.object({
+  name: skillNameSchema,
+  version: z.number().int().positive(),
+  fingerprint: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  claudeCodeOnly: z.boolean(),
+  downloadUrl: z.string().min(1),
+  expiresInSeconds: z.number().int().positive()
+});
+export type InstallInfo = z.infer<typeof installInfoSchema>;
+
+/** begin_publish が返す、アップロードの受け皿。 */
+export const publishTicketSchema = z.object({
+  uploadId: z.string().min(1),
+  uploadUrl: z.string().min(1),
+  expiresAt: z.string().min(1),
+  maxBytes: z.number().int().positive()
+});
+export type PublishTicket = z.infer<typeof publishTicketSchema>;
+
+/** finish_publish が返す、公開の結果。公開できたときだけ新しい指紋を返す。 */
+export const finishPublishResultSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("published"),
+    name: skillNameSchema,
+    version: z.number().int().positive(),
+    fingerprint: z.string().min(1),
+    fileCount: z.number().int().nonnegative(),
+    sizeBytes: z.number().int().nonnegative()
+  }),
+  z.object({
+    status: z.literal("unchanged"),
+    name: skillNameSchema,
+    version: z.number().int().positive()
+  })
+]);
+export type FinishPublishResult = z.infer<typeof finishPublishResultSchema>;

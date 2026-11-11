@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { failure } from "@/server/lib/http";
 import { notFound, type Result } from "@/server/lib/result";
+import type { InstallInfo } from "@/shared/schemas/mcp";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 
 /** API が使うスキル service の口。実体は bootstrap が組み立てて注入する。 */
@@ -9,20 +10,7 @@ export type SkillServicePort = {
   list(query: string): Promise<Result<SkillSummary[]>>;
   show(name: string): Promise<Result<SkillDetailResponse>>;
   preview(name: string, version: number, path: string): Promise<Result<string>>;
-  installInfo(
-    name: string,
-    version?: number
-  ): Promise<
-    Result<{
-      name: string;
-      version: number;
-      fingerprint: string;
-      sizeBytes: number;
-      claudeCodeOnly: boolean;
-      downloadUrl: string;
-      expiresInSeconds: 600;
-    }>
-  >;
+  installInfo(name: string, version?: number): Promise<Result<InstallInfo>>;
 };
 
 export type SkillsEnv = { Variables: { skillService: SkillServicePort } };

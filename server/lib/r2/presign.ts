@@ -32,7 +32,7 @@ export function r2S3ConfigFrom(env: R2S3Env): Result<R2S3Config> {
     .map(([name]) => name);
 
   if (!R2_ACCOUNT_ID || !R2_BUCKET_NAME || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-    return invalid("R2 の S3 の設定が足りません", { missing });
+    return invalid("R2 の S3 の設定が足りません", { missingConfig: true, missing });
   }
 
   return ok({

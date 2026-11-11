@@ -8,6 +8,7 @@ import type {
   SkillVersionRepository,
   SkillVersionRow
 } from "@/server/repositories/skill-version-repository";
+import type { InstallInfo } from "@/shared/schemas/mcp";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 
 /** プレビューで返すテキストの上限（256KB）。 */
@@ -200,20 +201,7 @@ export class SkillService {
   }
 
   /** 指定の版（省略時は最新版）を入れるための、600 秒有効の署名付きダウンロード URL を返す。 */
-  async installInfo(
-    name: string,
-    requestedVersion?: number
-  ): Promise<
-    Result<{
-      name: string;
-      version: number;
-      fingerprint: string;
-      sizeBytes: number;
-      claudeCodeOnly: boolean;
-      downloadUrl: string;
-      expiresInSeconds: 600;
-    }>
-  > {
+  async installInfo(name: string, requestedVersion?: number): Promise<Result<InstallInfo>> {
     const skillResult = await this.deps.skills.findByName(name);
     if (!skillResult.ok) return skillResult;
     const skill = skillResult.value;

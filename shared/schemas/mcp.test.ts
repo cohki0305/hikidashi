@@ -3,8 +3,11 @@ import {
   beginPublishInputSchema,
   checkSkillUpdatesInputSchema,
   finishPublishInputSchema,
+  finishPublishResultSchema,
+  installInfoSchema,
   installSkillInputSchema,
-  listSkillsInputSchema
+  listSkillsInputSchema,
+  publishTicketSchema
 } from "./mcp";
 
 const installed = (count: number) =>
@@ -71,5 +74,69 @@ describe("MCP ツールの入力", () => {
     expect(
       finishPublishInputSchema.safeParse({ uploadId: "upload-1", note: "あ".repeat(501) }).success
     ).toBe(false);
+  });
+});
+
+describe("MCP ツールの結果", () => {
+  const installedInfo = {
+    name: "invoice-entry",
+    version: 3,
+    fingerprint: "fp-3",
+    sizeBytes: 120,
+    claudeCodeOnly: false,
+    downloadUrl: "https://r2.example.test/download?signature=abc",
+    expiresInSeconds: 600
+  };
+
+  test("install_skill の結果は指紋とダウンロード先を必須にする", () => {
+    expect(installInfoSchema.safeParse(installedInfo).success).toBe(true);
+    expect(
+      installInfoSchema.safeParse({
+        name: "invoice-entry",
+        version: 3,
+        sizeBytes: 120,
+        claudeCodeOnly: false,
+        downloadUrl: "https://r2.example.test/download?signature=abc",
+        expiresInSeconds: 600
+      }).success
+    ).toBe(false);
+  });
+
+  test("begin_publish の結果は受け皿とアップロード先を必須にする", () => {
+    const ticket = {
+      uploadId: "upload-1",
+      uploadUrl: "https://r2.example.test/uploads/upload-1.zip?signature=abc",
+      expiresAt: "2026-01-01T00:30:00.000Z",
+      maxBytes: 209_715_200
+    };
+    expect(publishTicketSchema.safeParse(ticket).success).toBe(true);
+  });
+
+  test("finish_publish の結果は公開時に指紋を必須にする", () => {
+    const published = {
+      status: "published",
+      name: "invoice-entry",
+      version: 4,
+      fingerprint: "fp-4",
+      fileCount: 2,
+      sizeBytes: 300
+    };
+    expect(finishPublishResultSchema.safeParse(published).success).toBe(true);
+    expect(
+      finishPublishResultSchema.safeParse({
+        status: "published",
+        name: "invoice-entry",
+        version: 4,
+        fileCount: 2,
+        sizeBytes: 300
+      }).success
+    ).toBe(false);
+    expect(
+      finishPublishResultSchema.safeParse({
+        status: "unchanged",
+        name: "invoice-entry",
+        version: 4
+      }).success
+    ).toBe(true);
   });
 });

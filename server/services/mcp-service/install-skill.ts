@@ -1,6 +1,7 @@
-import { type InstallInfo, type McpTool, MISSING_CONFIG_MESSAGE } from "@/server/lib/mcp/json-rpc";
-import { ok, upstream } from "@/server/lib/result";
+import type { InstallInfo, McpTool } from "@/server/lib/mcp/json-rpc";
+import { ok } from "@/server/lib/result";
 import { type InstallSkillInput, installSkillInputSchema } from "@/shared/schemas/mcp";
+import { toMissingConfig } from "./missing-config";
 
 const CLAUDE_AI_STEP =
   "claude.ai では、downloadUrl を利用者に渡し、zip を保存して『設定 › 機能 › スキル』からアップロードしてもらう。";
@@ -24,14 +25,7 @@ export const installSkillTool: McpTool<InstallSkillInput> = {
   input: installSkillInputSchema,
   async call(ctx, input) {
     const result = await ctx.install.installInfo(input.name, input.version);
-    if (!result.ok) {
-      if (
-        result.details?.missingConfig === true ||
-        result.message === "R2 の S3 の設定が足りません"
-      )
-        return upstream(MISSING_CONFIG_MESSAGE);
-      return result;
-    }
+    if (!result.ok) return toMissingConfig(result) ?? result;
 
     const info = result.value;
     return ok({

@@ -1,6 +1,7 @@
 import { type McpTool, MISSING_CONFIG_MESSAGE } from "@/server/lib/mcp/json-rpc";
 import { ok, upstream } from "@/server/lib/result";
 import { type FinishPublishInput, finishPublishInputSchema } from "@/shared/schemas/mcp";
+import { toMissingConfig } from "./missing-config";
 
 /** begin_publish で送った zip を検査して、新しい版として公開する。 */
 export const finishPublishTool: McpTool<FinishPublishInput> = {
@@ -12,14 +13,7 @@ export const finishPublishTool: McpTool<FinishPublishInput> = {
     if (ctx.publish === undefined) return upstream(MISSING_CONFIG_MESSAGE);
 
     const result = await ctx.publish.finish(ctx.email, input.uploadId, input.note);
-    if (!result.ok) {
-      if (
-        result.details?.missingConfig === true ||
-        result.message === "R2 の S3 の設定が足りません"
-      )
-        return upstream(MISSING_CONFIG_MESSAGE);
-      return result;
-    }
+    if (!result.ok) return toMissingConfig(result) ?? result;
 
     return ok(result.value);
   }
