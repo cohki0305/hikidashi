@@ -1,0 +1,5 @@
+# 手元の開発用の環境変数。`.dev.vars` にコピーして使う。
+# APP_ENV=development のときだけ DEV_ACCESS_EMAIL を本人として通す。
+# 本番では APP_ENV を設定しない（Cloudflare Access の JWT を検証する）。
+APP_ENV=development
+DEV_ACCESS_EMAIL=dev@example.com
