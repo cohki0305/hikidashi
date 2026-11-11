@@ -1,8 +1,21 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap");
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
 body {
   margin: 0;
-  font-family: "Noto Sans JP", "Hiragino Sans", sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: var(--color-primary-dark);
 }
 
 .app-main {
