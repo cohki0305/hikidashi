@@ -73,8 +73,8 @@ bunx wrangler secret put R2_SECRET_ACCESS_KEY
 
 ## 6. Access のアプリを作る
 
-ログインできる人を決める Access のアプリを 1 つ作ります。手順は [access.md](./access.md) にあります。
-作ったアプリの AUD を、`wrangler.jsonc` の `ACCESS_AUD` に入れます。
+ホスト全体を守るアプリと、Claude がつなぐ道を外す Bypass のアプリの 2 つを作ります。手順は [access.md](./access.md) にあります。
+守るアプリの AUD を、`wrangler.jsonc` の `ACCESS_AUD` に入れます。
 
 ## 7. 公開する
 
