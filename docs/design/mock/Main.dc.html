@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>チームのスキル</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+a{color:#1d4ed8}a:hover{color:#1e3a8a}
+.card:hover{border-color:#93c5fd}
+</style>
+</helmet>
+<div style="min-height: 960px; background: #f8fafc; color: #0f172a; font-family: Inter, 'Noto Sans JP', sans-serif; font-size: 15px;">
+  <header style="background: #ffffff; border-bottom: 1px solid #e2e8f0;">
+    <div style="max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; gap: 32px; flex-wrap: wrap;">
+      <a href="Main.dc.html" style="font-weight: 700; font-size: 18px; color: #0f172a; text-decoration: none;">teamskill</a>
+      <nav style="display: flex; gap: 24px; flex-grow: 1;">
+        <a href="Main.dc.html" style="color: #1d4ed8; font-weight: 600; text-decoration: none; padding: 20px 0; border-bottom: 2px solid #1d4ed8;">スキル</a>
+        <a href="Connect.dc.html" style="color: #475569; text-decoration: none; padding: 20px 0;">つなぎ方</a>
+      </nav>
+      <span style="font-size: 14px; color: #475569;">sato@example.com</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1120px; margin: 0 auto; padding: 40px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700;">チームのスキル</h1>
+        <p style="margin: 0; color: #475569;">追加するときは、Claude に「このスキルをチームに公開して」と頼みます。</p>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #475569; width: 320px; max-width: 100%;">
+        スキルを探す
+        <input type="search" placeholder="名前や説明で探す" value="{{query}}" onInput="{{onQuery}}" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; color: #0f172a; background: #ffffff;">
+      </label>
+    </div>
+
+    <p style="margin: 0; font-size: 14px; color: #475569;">{{countLabel}}</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
+      <sc-for list="{{shown}}" as="s" hint-placeholder-count="6">
+        <a class="card" href="Detail.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; text-decoration: none; color: #0f172a; min-height: 168px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+            <span style="font-size: 17px; font-weight: 700;">{{s.name}}</span>
+            <span style="font-size: 12px; color: #475569; white-space: nowrap;">{{s.version}}</span>
+          </div>
+          <p style="margin: 0; color: #334155; line-height: 1.6; flex-grow: 1;">{{s.desc}}</p>
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: #475569;">
+            <span>{{s.author}}</span>
+            <span>{{s.updated}}</span>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":960}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { query: '' }; }
+  renderVals() {
+    const all = [
+      { name: '議事録まとめ', desc: '会議の文字起こしから、決まったこと・宿題・期限を表にまとめる。', author: '鈴木', updated: '11月10日', version: '第3版' },
+      { name: '提案書の見直し', desc: '提案書を顧客の立場で読み、わかりにくい所と足りない数字を指摘する。', author: '木村', updated: '11月8日', version: '第5版' },
+      { name: '見積書PDF', desc: '品目と金額を伝えると、会社の書式の見積書を1枚のPDFで作る。', author: '鈴木', updated: '11月2日', version: '第2版' },
+      { name: 'ヒアリング準備', desc: '訪問先の会社名から、事前に聞くことの一覧と仮説を作る。', author: '田中', updated: '10月30日', version: '第1版' },
+      { name: '業務の棚卸し', desc: '社員へのアンケート結果から、AIで楽にできそうな仕事を洗い出す。', author: '木村', updated: '10月27日', version: '第4版' },
+      { name: '週次報告', desc: '1週間のメモから、顧客向けの週次報告メールの下書きを作る。', author: '田中', updated: '10月21日', version: '第2版' }
+    ];
+    const q = this.state.query.trim();
+    const shown = q ? all.filter((s) => (s.name + s.desc).includes(q)) : all;
+    return {
+      query: this.state.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      shown,
+      countLabel: q ? `「${q}」で ${shown.length} 件` : `${all.length} 件`
+    };
+  }
+}
+</script>
+</body>
+</html>
