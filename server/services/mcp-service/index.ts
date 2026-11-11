@@ -1,11 +1,16 @@
 import { z } from "zod";
-import type {
-  JsonRpcHandlers,
-  McpTool,
-  SkillCatalog,
-  ToolDescriptor,
-  ToolOutcome
+import {
+  type InstallPort,
+  type JsonRpcHandlers,
+  type McpTool,
+  type McpToolContext,
+  MISSING_CONFIG_MESSAGE,
+  type PublishPort,
+  type SkillCatalog,
+  type ToolDescriptor,
+  type ToolOutcome
 } from "@/server/lib/mcp/json-rpc";
+import { upstream } from "@/server/lib/result";
 import type { OAuthService } from "@/server/services/oauth-service";
 import { MCP_TOOLS } from "./tools";
 
@@ -14,6 +19,10 @@ export type McpServiceDeps = {
   oauth: Pick<OAuthService, "authenticate">;
   /** スキルの一覧と詳細。 */
   skills: SkillCatalog;
+  /** スキルを手元に入れるための口。 */
+  install?: InstallPort;
+  /** スキルを公開するための口。 */
+  publish?: PublishPort;
   /** 載せるツール。省略すると MCP_TOOLS を全部載せる。 */
   tools?: readonly McpTool<unknown>[];
 };
@@ -60,7 +69,14 @@ export class McpService {
     const parsed = tool.input.safeParse(args);
     // 入力の間違いは JSON-RPC のエラーではなく、ツールの結果として返す（相手が直せる）
     if (!parsed.success) return { kind: "error", content: "入力が正しくありません" };
-    const callContext = { email: ctx.email, skills: this.deps.skills };
+    const callContext: McpToolContext = {
+      email: ctx.email,
+      skills: this.deps.skills,
+      install: this.deps.install ?? {
+        installInfo: async () => upstream(MISSING_CONFIG_MESSAGE, { missingConfig: true })
+      },
+      ...(this.deps.publish === undefined ? {} : { publish: this.deps.publish })
+    };
     const result = await tool.call(callContext, parsed.data);
     if (!result.ok) return { kind: "error", content: result.message };
     const { value } = result;

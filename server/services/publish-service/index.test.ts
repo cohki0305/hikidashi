@@ -177,6 +177,7 @@ describe("PublishService.finish", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    if (result.value.status !== "published") throw new Error("公開されていません");
     expect(result.value).toMatchObject({
       status: "published",
       name: "alpha",
@@ -195,6 +196,7 @@ describe("PublishService.finish", () => {
     });
     const versions = await versionRows(testDb.db, skill.id);
     expect(versions).toHaveLength(1);
+    expect(result.value.fingerprint).toBe(versions[0]?.fingerprint);
     expect(versions[0]).toMatchObject({
       version: 1,
       note: "最初の版",
@@ -293,7 +295,7 @@ describe("PublishService.finish", () => {
     expect(await service.finish("dev@example.com", usedId)).toMatchObject({
       ok: false,
       kind: "invalid",
-      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
+      message: "受け皿の期限が切れました。もう一度 begin_publish からやり直してください"
     });
 
     const expiredId = await uploadZip(fake, service, "dev@example.com", skillZip("beta"));
@@ -305,7 +307,7 @@ describe("PublishService.finish", () => {
     expect(await service.finish("dev@example.com", expiredId)).toMatchObject({
       ok: false,
       kind: "invalid",
-      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
+      message: "受け皿の期限が切れました。もう一度 begin_publish からやり直してください"
     });
   });
 
@@ -439,7 +441,13 @@ describe("PublishService.finish", () => {
 
     expect(await withoutS3.finish("dev@example.com", uploadId)).toMatchObject({
       ok: false,
-      kind: "invalid"
+      kind: "invalid",
+      details: { missingConfig: true }
+    });
+    expect(await withoutS3.finish("dev@example.com", "missing")).toMatchObject({
+      ok: false,
+      kind: "invalid",
+      details: { missingConfig: true }
     });
   });
 });

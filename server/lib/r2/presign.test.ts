@@ -32,6 +32,7 @@ describe("r2S3ConfigFrom", () => {
     if (!result.ok) {
       expect(result.kind).toBe("invalid");
       expect(result.message).toBeTruthy();
+      expect(result.details).toMatchObject({ missingConfig: true });
     }
   });
 });

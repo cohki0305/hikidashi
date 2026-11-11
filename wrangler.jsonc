@@ -3,14 +3,22 @@
   "main": "server/entry/worker.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
+  // workers.dev の URL で公開する（独自ドメインは使わない）。プレビュー用の URL は作らない。
+  "workers_dev": true,
+  "preview_urls": false,
   // Cloudflare Access の JWT 検証に使う。値は本番の Access アプリに合わせて差し替える。
   "vars": {
+    // Access のチームの URL。例: https://<チーム名>.cloudflareaccess.com
     "ACCESS_TEAM_DOMAIN": "https://hikidashi.cloudflareaccess.com",
+    // Access アプリの AUD（アプリの概要に出る Audience タグ）。アプリは 1 つだけ作り、その値を入れる。
     "ACCESS_AUD": "<あとで設定する>",
-    // OAuth と MCP の入口が名乗る自分の URL。未設定ならそれらの入口は載せない（404）。
+    // OAuth と MCP の入口が名乗る自分の URL。デプロイ後の URL を入れる。
+    // 例: https://hikidashi.<サブドメイン>.workers.dev（末尾の / は付けない）。未設定ならそれらの入口は載せない（404）。
     "APP_URL": "<あとで設定する>",
-    // R2 の S3 互換 API の署名に使う。キー（R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）は Worker のシークレット。
+    // R2 の S3 互換 API の署名に使う。Cloudflare のアカウント ID を入れる（R2 の画面に出る）。
+    // キー（R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）は Worker のシークレット。
     "R2_ACCOUNT_ID": "<あとで設定する>",
+    // zip を置く R2 バケットの名前。デプロイのときに作る hikidashi-skills を入れる。
     "R2_BUCKET_NAME": "hikidashi-skills"
   },
   // D1 はスキルのメタデータ、R2 は版の zip を置く。database_id は本番の D1 を作ったときに差し替える。

@@ -10,6 +10,7 @@ import type {
   UploadRepository,
   UploadRow
 } from "@/server/repositories/upload-repository";
+import type { FinishPublishResult, PublishTicket } from "@/shared/schemas/mcp";
 
 /** 1 版の zip の上限（200 MB）。 */
 export const MAX_UPLOAD_BYTES = 209_715_200;
@@ -20,7 +21,7 @@ const CLEANUP_LIMIT = 100;
 /** 同時公開で UNIQUE 違反になったときの文言。 */
 const CONFLICT_MESSAGE = "同時に公開されました。もう一度公開してください。";
 /** 受け皿が使えないときの文言。 */
-const EXPIRED_MESSAGE = "受け皿の期限が切れました。もう一度 begin からやり直してください";
+const EXPIRED_MESSAGE = "受け皿の期限が切れました。もう一度 begin_publish からやり直してください";
 /** S3 の設定が無いときの文言。 */
 const MISSING_CONFIG_MESSAGE = "R2 の S3 の設定が足りません";
 
@@ -37,26 +38,14 @@ export type PublishServiceDeps = {
   now?: () => Date;
 };
 
-export type FinishPublishResult =
-  | {
-      status: "published";
-      name: string;
-      version: number;
-      fileCount: number;
-      sizeBytes: number;
-    }
-  | { status: "unchanged"; name: string; version: number };
-
 /** 公開の受け皿づくり・zip の検査・版の登録・期限切れの掃除。 */
 export class PublishService {
   constructor(private readonly deps: PublishServiceDeps) {}
 
   /** 受け皿を作り、アップロード用の署名付き URL を返す。 */
-  async begin(
-    email: string
-  ): Promise<Result<{ uploadId: string; uploadUrl: string; expiresAt: string; maxBytes: number }>> {
+  async begin(email: string): Promise<Result<PublishTicket>> {
     const config = this.deps.s3;
-    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE);
+    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE, { missingConfig: true });
 
     const uploadId = crypto.randomUUID();
     const r2Key = `uploads/${uploadId}.zip`;
@@ -90,6 +79,9 @@ export class PublishService {
     uploadId: string,
     note?: string
   ): Promise<Result<FinishPublishResult>> {
+    const config = this.deps.s3;
+    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE, { missingConfig: true });
+
     const now = this.deps.now ?? (() => new Date());
     const uploadResult = await this.deps.uploads.findById(uploadId);
     if (!uploadResult.ok) return uploadResult;
@@ -98,9 +90,6 @@ export class PublishService {
       return notFound("この受け皿は見つかりません");
     if (upload.status !== "pending" || Date.parse(upload.expiresAt) <= now().getTime())
       return invalid(EXPIRED_MESSAGE);
-
-    const config = this.deps.s3;
-    if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE);
 
     const head = await this.head(upload);
     if (!head.ok) return head;
@@ -161,6 +150,7 @@ export class PublishService {
       status: "published",
       name: skill.name,
       version,
+      fingerprint: skill.fingerprint,
       fileCount: skill.fileCount,
       sizeBytes: skill.sizeBytes
     });
