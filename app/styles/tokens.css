@@ -1,0 +1,12 @@
+:root {
+  --color-primary: #1d4ed8;
+  --color-primary-dark: #1e3a8a;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-sub: #334155;
+  --color-text-muted: #475569;
+  --color-border: #e2e8f0;
+  --color-border-input: #cbd5e1;
+  --font-sans: Inter, "Noto Sans JP", sans-serif;
+}
