@@ -1,6 +1,8 @@
 {
   "name": "hikidashi",
   "main": "server/entry/worker.ts",
+  // cohki0305 のアカウント。ログイン中に複数のアカウントが見えても、ここに出す。
+  "account_id": "<アカウント ID>",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   // workers.dev の URL で公開する（独自ドメインは使わない）。プレビュー用の URL は作らない。
@@ -14,10 +16,10 @@
     "ACCESS_AUD": "<あとで設定する>",
     // OAuth と MCP の入口が名乗る自分の URL。デプロイ後の URL を入れる。
     // 例: https://hikidashi.<サブドメイン>.workers.dev（末尾の / は付けない）。未設定ならそれらの入口は載せない（404）。
-    "APP_URL": "<あとで設定する>",
+    "APP_URL": "https://hikidashi.<サブドメイン>.workers.dev",
     // R2 の S3 互換 API の署名に使う。Cloudflare のアカウント ID を入れる（R2 の画面に出る）。
     // キー（R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）は Worker のシークレット。
-    "R2_ACCOUNT_ID": "<あとで設定する>",
+    "R2_ACCOUNT_ID": "<アカウント ID>",
     // zip を置く R2 バケットの名前。デプロイのときに作る hikidashi-skills を入れる。
     "R2_BUCKET_NAME": "hikidashi-skills"
   },
@@ -26,7 +28,7 @@
     {
       "binding": "DB",
       "database_name": "hikidashi",
-      "database_id": "<あとで作る>",
+      "database_id": "<D1 の ID>",
       "migrations_dir": "drizzle"
     }
   ],
