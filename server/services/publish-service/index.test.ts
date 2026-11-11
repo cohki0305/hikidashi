@@ -49,12 +49,14 @@ class FailingUploadRepository extends UploadRepository {
   }
 }
 
-/** 検査とコピーの間に cleanupExpired が走った状況を作る。 */
+/** コピーと記録の間に cleanupExpired が走った状況を作る。 */
 class ExpiringUploadRepository extends UploadRepository {
-  override async markUsedIfPending(id: string): Promise<Result<boolean>> {
-    await this.markExpired(id);
-    return await super.markUsedIfPending(id);
+  override async commit(statements: readonly BatchStatement[]): Promise<Result<void>> {
+    const id = this.expiringId;
+    if (id !== undefined) await this.markExpired(id);
+    return await super.commit(statements);
   }
+  expiringId: string | undefined;
 }
 
 function setup(
@@ -84,7 +86,7 @@ function setup(
     fetchImpl,
     now: () => options.now ?? NOW
   });
-  return { testDb, fake, service, calls };
+  return { testDb, fake, service, calls, uploads };
 }
 
 const SKILL_MD = (name: string, description: string) =>
@@ -393,21 +395,17 @@ describe("PublishService.finish", () => {
     ).toBe("other");
   });
 
-  test("検査中に受け皿が期限切れになったら公開せず、コピーした版も消す", async () => {
-    const { testDb, fake, service, calls } = setup({ expireBeforeUse: true });
+  test("コピーの後に受け皿が期限切れ扱いになっても、コピー済みの版は正しく登録される", async () => {
+    const { testDb, fake, service, calls, uploads } = setup({ expireBeforeUse: true });
     const uploadId = await uploadZip(fake, service, "dev@example.com", skillZip("alpha"));
+    if (uploads instanceof ExpiringUploadRepository) uploads.expiringId = uploadId;
 
     const result = await service.finish("dev@example.com", uploadId);
 
-    expect(result).toMatchObject({
-      ok: false,
-      kind: "invalid",
-      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
-    });
-    expect((await uploadRow(testDb.db, uploadId))?.status).toBe("expired");
-    expect(await skillRows(testDb.db)).toEqual([]);
+    expect(result).toMatchObject({ ok: true, value: { status: "published", version: 1 } });
+    expect(await skillRows(testDb.db)).toHaveLength(1);
     expect(calls).toHaveLength(1);
-    expect(fake.objects.has(calls[0]?.toKey ?? "")).toBe(false);
+    expect(fake.objects.has(calls[0]?.toKey ?? "")).toBe(true);
   });
 
   test("D1 の書き込みが失敗したらコピー済みの版の zip を消す", async () => {

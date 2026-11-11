@@ -52,8 +52,10 @@ function createClient(config: R2S3Config): AwsClient {
   });
 }
 
+const encodeKey = (key: string) => key.split("/").map(encodeURIComponent).join("/");
+
 function objectUrl(config: R2S3Config, key: string): URL {
-  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  const encodedKey = encodeKey(key);
   return new URL(
     `https://${config.accountId}.r2.cloudflarestorage.com/${encodeURIComponent(config.bucket)}/${encodedKey}`
   );
@@ -99,7 +101,9 @@ export async function copyObject(
   try {
     const request = await createClient(config).sign(objectUrl(config, toKey), {
       method: "PUT",
-      headers: { "x-amz-copy-source": `/${config.bucket}/${fromKey}` }
+      headers: {
+        "x-amz-copy-source": `/${encodeURIComponent(config.bucket)}/${encodeKey(fromKey)}`
+      }
     });
     const response = await fetchImpl(request);
     if (!response.ok) {

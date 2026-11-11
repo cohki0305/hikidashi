@@ -109,20 +109,6 @@ export class UploadRepository {
     }
   }
 
-  /** used にした受け皿を pending へ戻す。公開の書き込みが失敗したときだけ使う。 */
-  async restorePending(id: string): Promise<Result<void>> {
-    try {
-      await this.db
-        .update(uploads)
-        .set({ status: "pending" })
-        .where(and(eq(uploads.id, id), eq(uploads.status, "used")))
-        .execute();
-      return ok(undefined);
-    } catch {
-      return upstream("受け皿を戻せませんでした");
-    }
-  }
-
   /** pending の受け皿だけを expired にし、実際に期限切れにできたかを返す。 */
   async markExpired(id: string): Promise<Result<boolean>> {
     try {

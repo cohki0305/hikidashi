@@ -135,12 +135,6 @@ export class PublishService {
     const copied = await copyObject(config, upload.r2Key, versionKey, this.deps.fetchImpl ?? fetch);
     if (!copied.ok) return copied;
 
-    const marked = await this.deps.uploads.markUsedIfPending(upload.id);
-    if (!marked.ok || !marked.value) {
-      await this.deleteObject(versionKey);
-      return marked.ok ? invalid(EXPIRED_MESSAGE) : marked;
-    }
-
     const statements = this.buildStatements({
       skillId,
       versionId,
@@ -152,10 +146,13 @@ export class PublishService {
       existing,
       skill
     });
+    // 受け皿を used にする文も同じ batch に入れ、版の記録とまとめて成功・失敗させる。
+    // 同時に公開されたときは skills.name か (skill_id, version) の一意制約で片方だけが通る。
+    // 版の zip のキーは版 ID を含むので、負けた側が消すのは自分のコピーだけ。
+    statements.push(this.deps.uploads.markUsedStatement(upload.id));
     const committed = await this.deps.uploads.commit(statements);
     if (!committed.ok) {
       await this.deleteObject(versionKey);
-      await this.deps.uploads.restorePending(upload.id);
       return committed.details?.unique === true ? conflict(CONFLICT_MESSAGE) : committed;
     }
 
