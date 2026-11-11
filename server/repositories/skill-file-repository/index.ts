@@ -6,6 +6,12 @@ import { ok, type Result, upstream } from "@/server/lib/result";
 /** skill_files テーブルの 1 行。 */
 export type SkillFileRow = typeof skillFiles.$inferSelect;
 
+/** batch にまとめる書き込み 1 文。 */
+type BatchStatement = { execute: () => Promise<unknown> };
+
+/** D1 の変数上限に収めるため、1 文に入れる行数。 */
+const MAX_ROWS_PER_STATEMENT = 20;
+
 /** skill_files テーブルの読み書き。 */
 export class SkillFileRepository {
   constructor(private readonly db: SkillDb) {}
@@ -41,5 +47,15 @@ export class SkillFileRepository {
     } catch {
       return upstream("スキルのファイルを読めませんでした");
     }
+  }
+
+  /** 版のファイルを作る文。1 文 20 行ずつに分ける。 */
+  insertStatements(rows: readonly SkillFileRow[]): BatchStatement[] {
+    const statements: BatchStatement[] = [];
+    for (let start = 0; start < rows.length; start += MAX_ROWS_PER_STATEMENT) {
+      const batch = rows.slice(start, start + MAX_ROWS_PER_STATEMENT);
+      statements.push(this.db.insert(skillFiles).values([...batch]));
+    }
+    return statements;
   }
 }
