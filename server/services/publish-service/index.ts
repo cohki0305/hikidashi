@@ -21,7 +21,7 @@ const CLEANUP_LIMIT = 100;
 /** 同時公開で UNIQUE 違反になったときの文言。 */
 const CONFLICT_MESSAGE = "同時に公開されました。もう一度公開してください。";
 /** 受け皿が使えないときの文言。 */
-const EXPIRED_MESSAGE = "受け皿の期限が切れました。もう一度 begin からやり直してください";
+const EXPIRED_MESSAGE = "受け皿の期限が切れました。もう一度 begin_publish からやり直してください";
 /** S3 の設定が無いときの文言。 */
 const MISSING_CONFIG_MESSAGE = "R2 の S3 の設定が足りません";
 

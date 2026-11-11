@@ -295,7 +295,7 @@ describe("PublishService.finish", () => {
     expect(await service.finish("dev@example.com", usedId)).toMatchObject({
       ok: false,
       kind: "invalid",
-      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
+      message: "受け皿の期限が切れました。もう一度 begin_publish からやり直してください"
     });
 
     const expiredId = await uploadZip(fake, service, "dev@example.com", skillZip("beta"));
@@ -307,7 +307,7 @@ describe("PublishService.finish", () => {
     expect(await service.finish("dev@example.com", expiredId)).toMatchObject({
       ok: false,
       kind: "invalid",
-      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
+      message: "受け皿の期限が切れました。もう一度 begin_publish からやり直してください"
     });
   });
 
