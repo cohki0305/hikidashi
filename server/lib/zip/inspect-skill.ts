@@ -248,6 +248,13 @@ export async function inspectSkillZip(source: RangeSource): Promise<Result<Inspe
     const normalized = normalizePaths(entries);
     if (!normalized.ok) return normalized;
 
+    // 同じパスが重なると、展開ツールによって入る中身が変わる。指紋も DB の主キーも破綻する。
+    const seen = new Set<string>();
+    for (const item of normalized.value) {
+      if (seen.has(item.path)) return invalid("zip の中に同じパスのファイルが複数あります");
+      seen.add(item.path);
+    }
+
     const skillMd = normalized.value.find((item) => item.path === "SKILL.md");
     if (!skillMd || skillMd.entry.uncompressedSize > MAX_TEXT_BYTES)
       return invalid("SKILL.md が大きすぎます");

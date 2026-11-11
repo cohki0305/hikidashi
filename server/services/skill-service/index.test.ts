@@ -469,7 +469,7 @@ describe("SkillService.installInfo", () => {
     });
   });
 
-  test("無い名前は notFound、S3 の設定が無ければ invalid", async () => {
+  test("無い名前は notFound、S3 の設定が無ければ missingConfig 付きの upstream", async () => {
     const { testDb, fake, service } = setup();
     await seedSkill(testDb.db, fake.bucket, {
       name: "alpha",
@@ -479,7 +479,11 @@ describe("SkillService.installInfo", () => {
     const withoutS3 = makeService(testDb, fake.bucket, undefined, null);
 
     expect(await service.installInfo("missing")).toMatchObject({ ok: false, kind: "not_found" });
-    expect(await withoutS3.installInfo("alpha")).toMatchObject({ ok: false, kind: "invalid" });
+    expect(await withoutS3.installInfo("alpha")).toMatchObject({
+      ok: false,
+      kind: "upstream",
+      details: { missingConfig: true }
+    });
   });
 
   test("claude.ai の上限を超える版は claudeCodeOnly にする", async () => {

@@ -49,14 +49,31 @@ class FailingUploadRepository extends UploadRepository {
   }
 }
 
-function setup(options: { now?: Date; s3?: R2S3Config | null; failCommit?: boolean } = {}) {
+/** 検査とコピーの間に cleanupExpired が走った状況を作る。 */
+class ExpiringUploadRepository extends UploadRepository {
+  override async markUsedIfPending(id: string): Promise<Result<boolean>> {
+    await this.markExpired(id);
+    return await super.markUsedIfPending(id);
+  }
+}
+
+function setup(
+  options: {
+    now?: Date;
+    s3?: R2S3Config | null;
+    failCommit?: boolean;
+    expireBeforeUse?: boolean;
+  } = {}
+) {
   const testDb = createTestDb();
   openDbs.push(testDb);
   const fake = createFakeR2Bucket();
   const { fetchImpl, calls } = copyFetcher(fake);
   const uploads = options.failCommit
     ? new FailingUploadRepository(testDb.db)
-    : new UploadRepository(testDb.db);
+    : options.expireBeforeUse
+      ? new ExpiringUploadRepository(testDb.db)
+      : new UploadRepository(testDb.db);
   const service = new PublishService({
     skills: new SkillRepository(testDb.db),
     versions: new SkillVersionRepository(testDb.db),
@@ -180,18 +197,18 @@ describe("PublishService.finish", () => {
       version: 1,
       note: "最初の版",
       publishedBy: "dev@example.com",
-      r2Key: `versions/${skill.id}/1.zip`,
       sizeBytes: zip.length
     });
+    const versionKey = versions[0]?.r2Key ?? "";
+    expect(versionKey).toStartWith(`versions/${skill.id}/1-`);
+    expect(versionKey).toEndWith(".zip");
     expect((await fileRows(testDb.db, versions[0]?.id ?? "")).map((file) => file.path)).toEqual([
       "SKILL.md",
       "scripts/run.md"
     ]);
 
-    expect(calls).toEqual([
-      { fromKey: `uploads/${uploadId}.zip`, toKey: `versions/${skill.id}/1.zip` }
-    ]);
-    expect(fake.objects.has(`versions/${skill.id}/1.zip`)).toBe(true);
+    expect(calls).toEqual([{ fromKey: `uploads/${uploadId}.zip`, toKey: versionKey }]);
+    expect(fake.objects.has(versionKey)).toBe(true);
     expect(fake.objects.has(`uploads/${uploadId}.zip`)).toBe(false);
     expect((await uploadRow(testDb.db, uploadId))?.status).toBe("used");
   });
@@ -247,9 +264,9 @@ describe("PublishService.finish", () => {
       latestVersion: 2,
       description: "説明を変えました"
     });
-    expect(calls).toEqual([
-      { fromKey: `uploads/${secondId}.zip`, toKey: `versions/${skillId}/2.zip` }
-    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.fromKey).toBe(`uploads/${secondId}.zip`);
+    expect(calls[0]?.toKey).toStartWith(`versions/${skillId}/2-`);
   });
 
   test("受け皿が無い・他人のもの・使用済み・期限切れはそれぞれ分かる文言で断る", async () => {
@@ -329,7 +346,7 @@ describe("PublishService.finish", () => {
   });
 
   test("同時公開の UNIQUE 違反は conflict にし、受け皿は pending のまま残す", async () => {
-    const { testDb, fake, service } = setup();
+    const { testDb, fake, service, calls } = setup();
     const firstId = await uploadZip(fake, service, "dev@example.com", skillZip("alpha"));
     await service.finish("dev@example.com", firstId);
     const skill = (await skillRows(testDb.db))[0];
@@ -341,6 +358,9 @@ describe("PublishService.finish", () => {
       "dev@example.com",
       skillZip("alpha", [{ path: "extra.md", data: "追加\n" }])
     );
+    const otherKey = `versions/${skill.id}/2-other-version-2.zip`;
+    const otherZip = new TextEncoder().encode("他人の版 2 の zip");
+    fake.objects.set(otherKey, otherZip);
     await testDb.db
       .insert(skillVersions)
       .values({
@@ -348,11 +368,11 @@ describe("PublishService.finish", () => {
         skillId: skill.id,
         version: 2,
         fingerprint: "other",
-        sizeBytes: 1,
+        sizeBytes: otherZip.length,
         fileCount: 1,
         note: null,
         publishedBy: "other@example.com",
-        r2Key: `versions/${skill.id}/2.zip`,
+        r2Key: otherKey,
         createdAt: NOW.toISOString()
       })
       .run();
@@ -365,10 +385,29 @@ describe("PublishService.finish", () => {
       message: "同時に公開されました。もう一度公開してください。"
     });
     expect((await uploadRow(testDb.db, secondId))?.status).toBe("pending");
-    expect(fake.objects.has(`versions/${skill.id}/2.zip`)).toBe(false);
+    // 負けた側は自分がコピーした版だけを消し、先に公開した他人の版 2 は残す。
+    expect(fake.objects.has(calls.at(-1)?.toKey ?? "")).toBe(false);
+    expect(fake.objects.get(otherKey)).toEqual(otherZip);
     expect(
       (await versionRows(testDb.db, skill.id)).find((version) => version.version === 2)?.fingerprint
     ).toBe("other");
+  });
+
+  test("検査中に受け皿が期限切れになったら公開せず、コピーした版も消す", async () => {
+    const { testDb, fake, service, calls } = setup({ expireBeforeUse: true });
+    const uploadId = await uploadZip(fake, service, "dev@example.com", skillZip("alpha"));
+
+    const result = await service.finish("dev@example.com", uploadId);
+
+    expect(result).toMatchObject({
+      ok: false,
+      kind: "invalid",
+      message: "受け皿の期限が切れました。もう一度 begin からやり直してください"
+    });
+    expect((await uploadRow(testDb.db, uploadId))?.status).toBe("expired");
+    expect(await skillRows(testDb.db)).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(fake.objects.has(calls[0]?.toKey ?? "")).toBe(false);
   });
 
   test("D1 の書き込みが失敗したらコピー済みの版の zip を消す", async () => {

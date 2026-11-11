@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "@/server/app";
 import type { AccessVerifier } from "@/server/lib/access/verify-access-jwt";
-import { forbidden, invalid, notFound, ok } from "@/server/lib/result";
+import { forbidden, invalid, notFound, ok, upstream } from "@/server/lib/result";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 import type { SkillServicePort } from "./context";
 
@@ -40,7 +40,7 @@ type ServiceCall =
   | { method: "preview"; name: string; version: number; path: string }
   | { method: "installInfo"; name: string; version: number };
 
-function fakeService(options: { missingConfig?: boolean } = {}) {
+function fakeService(options: { missingConfig?: boolean; invalidInput?: boolean } = {}) {
   const calls: ServiceCall[] = [];
   const service: SkillServicePort = {
     list: async (query) => {
@@ -59,7 +59,9 @@ function fakeService(options: { missingConfig?: boolean } = {}) {
     },
     installInfo: async (name, version = summary.latestVersion) => {
       calls.push({ method: "installInfo", name, version });
-      if (options.missingConfig) return invalid("R2 の S3 の設定が足りません");
+      if (options.missingConfig)
+        return upstream("R2 の S3 の設定が足りません", { missingConfig: true });
+      if (options.invalidInput) return invalid("入力が正しくありません");
       if (name !== summary.name || version !== summary.latestVersion)
         return notFound("スキルの版が見つかりません");
       return ok({
@@ -196,6 +198,18 @@ describe("GET /api/skills/:skillName/versions/:version/download", () => {
     });
 
     expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ kind: "upstream" });
+  });
+
+  test("設定不足以外の invalid は 503 にせず 400", async () => {
+    const { service } = fakeService({ invalidInput: true });
+
+    const response = await buildApp(service).request("/api/skills/team-skill/versions/2/download", {
+      headers: AUTH_HEADER
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ kind: "invalid" });
   });
 
   test("版が数字でない・0・最新より大きいときは 404", async () => {

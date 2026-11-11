@@ -1,12 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { type MakeZipEntry, makeZip } from "@/tests/helpers/make-zip";
 import {
+  centralEntriesOf,
   setCentralMethod,
   setCentralUncompressedSize,
   setEncryptedFlag
 } from "@/tests/helpers/zip-mutations";
 import { type RangeSource, readCentralDirectory } from "./central-directory";
 import { inspectSkillZip } from "./inspect-skill";
+
+/** 中央ディレクトリのパスを同じ長さの別名へ書き換え、重複したエントリを作る。 */
+function renameCentralPath(bytes: Uint8Array, from: string, to: string): void {
+  if (from.length !== to.length) throw new Error("同じ長さのパスにだけ書き換えられます");
+  const entry = centralEntriesOf(bytes).find((candidate) => candidate.path === from);
+  if (!entry) throw new Error(`エントリがありません: ${from}`);
+  bytes.set(new TextEncoder().encode(to), entry.offset + 46);
+}
 
 function sourceOf(bytes: Uint8Array, size = bytes.length): RangeSource {
   return {
@@ -96,6 +105,32 @@ describe("inspectSkillZip", () => {
     expect(result).toMatchObject({ ok: false, kind: "invalid" });
     if (result.ok) return;
     expect(result.message).toContain("SKILL.md");
+  });
+
+  test("トップフォルダを外した後に同じパスが重なる zip は断る", async () => {
+    const zip = makeZip([
+      { path: "my-skill/SKILL.md", data: SKILL_MD },
+      { path: "my-skill/SKILL.mx", data: "別の中身\n" }
+    ]);
+    renameCentralPath(zip, "my-skill/SKILL.mx", "my-skill/SKILL.md");
+    const result = await inspect(zip);
+
+    expect(result).toMatchObject({ ok: false, kind: "invalid" });
+    if (result.ok) return;
+    expect(result.message).toContain("同じパス");
+  });
+
+  test("SKILL.md が 2 つある zip は断る", async () => {
+    const zip = makeZip([
+      { path: "SKILL.md", data: SKILL_MD },
+      { path: "SKILL.mx", data: "別の中身\n" }
+    ]);
+    renameCentralPath(zip, "SKILL.mx", "SKILL.md");
+    const result = await inspect(zip);
+
+    expect(result).toMatchObject({ ok: false, kind: "invalid" });
+    if (result.ok) return;
+    expect(result.message).toContain("同じパス");
   });
 
   test("SKILL.md がどこにも無ければ断る", async () => {

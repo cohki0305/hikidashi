@@ -13,8 +13,10 @@ export const index = factory.createHandlers(
 
     const result = await c.get("skillService").installInfo(skillName, version);
     if (!result.ok) {
-      // 署名の設定が欠けているときは、zip を Worker で流す道に戻さず 503 で閉じる。
-      return result.kind === "invalid" ? unavailable(c, result.message) : failure(c, result);
+      // 署名の設定が欠けているときだけ、zip を Worker で流す道に戻さず 503 で閉じる。
+      return result.kind === "upstream" && result.details?.missingConfig === true
+        ? unavailable(c, result.message)
+        : failure(c, result);
     }
     return redirect(c, result.value.downloadUrl);
   }

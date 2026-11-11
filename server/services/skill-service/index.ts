@@ -1,5 +1,5 @@
 import { presignGet, type R2S3Config } from "@/server/lib/r2/presign";
-import { invalid, notFound, ok, type Result, upstream } from "@/server/lib/result";
+import { notFound, ok, type Result, upstream } from "@/server/lib/result";
 import { openEntryStream, r2RangeSource, readCentralDirectory } from "@/server/lib/zip";
 import type { SkillFileRepository } from "@/server/repositories/skill-file-repository";
 import type { SkillRepository, SkillRow } from "@/server/repositories/skill-repository";
@@ -213,7 +213,8 @@ export class SkillService {
     if (version === null) return notFound("スキルの版が見つかりません");
 
     const config = this.deps.s3;
-    if (config === undefined) return invalid("R2 の S3 の設定が足りません");
+    if (config === undefined)
+      return upstream("R2 の S3 の設定が足りません", { missingConfig: true });
 
     let downloadUrl: string;
     try {

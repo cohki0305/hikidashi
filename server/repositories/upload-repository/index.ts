@@ -27,8 +27,23 @@ function errorText(error: unknown): string {
   return `${error.message} ${cause instanceof Error ? cause.message : String(cause ?? "")}`;
 }
 
+/** 同時公開で競合する一意制約だけを拾う。uploads や skill_files の衝突は別の失敗。 */
 function isUniqueViolation(error: unknown): boolean {
-  return /unique constraint/i.test(errorText(error));
+  const text = errorText(error);
+  return (
+    /unique constraint failed:\s*skills\.name/i.test(text) ||
+    /unique constraint failed:\s*skill_versions\.skill_id,\s*skill_versions\.version/i.test(text)
+  );
+}
+
+/** D1 とテストの同期 DB で形の違う更新件数を読む。 */
+function changesOf(value: unknown): number {
+  if (typeof value !== "object" || value === null) return 0;
+  const result = value as { changes?: unknown; meta?: { changes?: unknown } };
+  if (typeof result.changes === "number") return result.changes;
+  if (result.meta !== undefined && typeof result.meta.changes === "number")
+    return result.meta.changes;
+  return 0;
 }
 
 /** uploads テーブルの読み書き。公開途中の zip の受け皿を扱う。 */
@@ -76,16 +91,47 @@ export class UploadRepository {
     }
   }
 
-  /** used にする文。公開の書き込みと同じ batch に入れる。 */
+  /** pending の受け皿だけを used にする文。 */
   markUsedStatement(id: string): BatchStatement {
-    return this.db.update(uploads).set({ status: "used" }).where(eq(uploads.id, id));
+    return this.db
+      .update(uploads)
+      .set({ status: "used" })
+      .where(and(eq(uploads.id, id), eq(uploads.status, "pending")));
   }
 
-  /** expired にする。 */
-  async markExpired(id: string): Promise<Result<void>> {
+  /** pending の受け皿だけを used にし、実際に更新できたかを返す。 */
+  async markUsedIfPending(id: string): Promise<Result<boolean>> {
     try {
-      await this.db.update(uploads).set({ status: "expired" }).where(eq(uploads.id, id)).execute();
+      const result = await this.markUsedStatement(id).execute();
+      return ok(changesOf(result) > 0);
+    } catch {
+      return upstream("受け皿を使用済みにできませんでした");
+    }
+  }
+
+  /** used にした受け皿を pending へ戻す。公開の書き込みが失敗したときだけ使う。 */
+  async restorePending(id: string): Promise<Result<void>> {
+    try {
+      await this.db
+        .update(uploads)
+        .set({ status: "pending" })
+        .where(and(eq(uploads.id, id), eq(uploads.status, "used")))
+        .execute();
       return ok(undefined);
+    } catch {
+      return upstream("受け皿を戻せませんでした");
+    }
+  }
+
+  /** pending の受け皿だけを expired にし、実際に期限切れにできたかを返す。 */
+  async markExpired(id: string): Promise<Result<boolean>> {
+    try {
+      const result = await this.db
+        .update(uploads)
+        .set({ status: "expired" })
+        .where(and(eq(uploads.id, id), eq(uploads.status, "pending")))
+        .execute();
+      return ok(changesOf(result) > 0);
     } catch {
       return upstream("受け皿を期限切れにできませんでした");
     }
@@ -105,7 +151,9 @@ export class UploadRepository {
       }
       return ok(undefined);
     } catch (error) {
-      return upstream("公開の記録を保存できませんでした", { unique: isUniqueViolation(error) });
+      return isUniqueViolation(error)
+        ? upstream("公開の記録を保存できませんでした", { unique: true })
+        : upstream("公開の記録を保存できませんでした");
     }
   }
 }

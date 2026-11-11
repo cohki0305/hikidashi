@@ -129,11 +129,17 @@ export class PublishService {
     const skillId = existing?.id ?? crypto.randomUUID();
     const version = (existing?.latestVersion ?? 0) + 1;
     const versionId = crypto.randomUUID();
-    const versionKey = `versions/${skillId}/${version}.zip`;
+    const versionKey = `versions/${skillId}/${version}-${versionId}.zip`;
     const createdAt = now().toISOString();
 
     const copied = await copyObject(config, upload.r2Key, versionKey, this.deps.fetchImpl ?? fetch);
     if (!copied.ok) return copied;
+
+    const marked = await this.deps.uploads.markUsedIfPending(upload.id);
+    if (!marked.ok || !marked.value) {
+      await this.deleteObject(versionKey);
+      return marked.ok ? invalid(EXPIRED_MESSAGE) : marked;
+    }
 
     const statements = this.buildStatements({
       skillId,
@@ -143,13 +149,13 @@ export class PublishService {
       createdAt,
       publishedBy: email,
       note: note ?? null,
-      upload,
       existing,
       skill
     });
     const committed = await this.deps.uploads.commit(statements);
     if (!committed.ok) {
       await this.deleteObject(versionKey);
+      await this.deps.uploads.restorePending(upload.id);
       return committed.details?.unique === true ? conflict(CONFLICT_MESSAGE) : committed;
     }
 
@@ -171,13 +177,14 @@ export class PublishService {
 
     let expired = 0;
     for (const upload of expiredResult.value) {
+      const marked = await this.deps.uploads.markExpired(upload.id);
+      if (!marked.ok || !marked.value) continue;
       try {
         await this.deps.bucket.delete(upload.r2Key);
       } catch {
         continue;
       }
-      const marked = await this.deps.uploads.markExpired(upload.id);
-      if (marked.ok) expired += 1;
+      expired += 1;
     }
     return { expired };
   }
@@ -188,10 +195,9 @@ export class PublishService {
     name: string,
     version: number
   ): Promise<Result<FinishPublishResult>> {
-    const committed = await this.deps.uploads.commit([
-      this.deps.uploads.markUsedStatement(uploadId)
-    ]);
-    if (!committed.ok) return committed;
+    const marked = await this.deps.uploads.markUsedIfPending(uploadId);
+    if (!marked.ok) return marked;
+    if (!marked.value) return invalid(EXPIRED_MESSAGE);
     await this.deleteObject(r2Key);
     return ok({ status: "unchanged", name, version });
   }
@@ -225,7 +231,6 @@ export class PublishService {
     createdAt: string;
     publishedBy: string;
     note: string | null;
-    upload: UploadRow;
     existing: { id: string } | null;
     skill: {
       name: string;
@@ -290,7 +295,6 @@ export class PublishService {
       )
     );
 
-    statements.push(this.deps.uploads.markUsedStatement(input.upload.id));
     return statements;
   }
 }

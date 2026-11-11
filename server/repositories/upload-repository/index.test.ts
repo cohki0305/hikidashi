@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { SkillDb } from "@/server/db";
-import { uploads } from "@/server/db/schema";
+import { skills, uploads } from "@/server/db/schema";
 import { createTestDb, type TestDb } from "@/tests/helpers/test-db";
 import { UploadRepository } from "./index";
 
@@ -91,11 +91,58 @@ describe("UploadRepository", () => {
 
     const expired = await repository.markExpired("upload-2");
     expect(expired.ok).toBe(true);
+    if (!expired.ok) return;
+    expect(expired.value).toBe(true);
     expect((await statusOf(db, "upload-2"))?.status).toBe("expired");
   });
 
-  test("commit は UNIQUE 違反を details で知らせる", async () => {
-    const { repository } = setup();
+  test("markUsedStatement と markExpired は pending 以外を変えない", async () => {
+    const { db, repository } = setup();
+    await insertUpload(db, "used", "used", "2026-01-01T00:30:00.000Z");
+    await insertUpload(db, "expired", "expired", "2026-01-01T00:30:00.000Z");
+
+    expect(await repository.markUsedIfPending("used")).toEqual({ ok: true, value: false });
+    expect(await repository.markUsedIfPending("expired")).toEqual({ ok: true, value: false });
+    expect((await statusOf(db, "used"))?.status).toBe("used");
+    expect((await statusOf(db, "expired"))?.status).toBe("expired");
+
+    const expired = await repository.markExpired("used");
+    expect(expired).toEqual({ ok: true, value: false });
+    expect((await statusOf(db, "used"))?.status).toBe("used");
+  });
+
+  test("commit は skills.name と skill_versions の UNIQUE 違反だけを details で知らせる", async () => {
+    const { db, repository } = setup();
+    await db
+      .insert(skills)
+      .values({
+        id: "skill-1",
+        name: "alpha",
+        title: "アルファ",
+        description: "見本です",
+        latestVersion: 1,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      })
+      .run();
+
+    const result = await repository.commit([
+      db.insert(skills).values({
+        id: "skill-2",
+        name: "alpha",
+        title: "アルファ",
+        description: "見本です",
+        latestVersion: 1,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      })
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.kind).toBe("upstream");
+    expect(result.details).toMatchObject({ unique: true });
+
     await repository.insertPending({
       id: "upload-1",
       r2Key: "uploads/upload-1.zip",
@@ -104,7 +151,7 @@ describe("UploadRepository", () => {
       createdAt: "2026-01-01T00:00:00.000Z"
     });
 
-    const result = await repository.commit([
+    const other = await repository.commit([
       repository.insertPendingStatement({
         id: "upload-1",
         r2Key: "uploads/upload-1.zip",
@@ -114,9 +161,8 @@ describe("UploadRepository", () => {
       })
     ]);
 
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.kind).toBe("upstream");
-    expect(result.details).toMatchObject({ unique: true });
+    expect(other).toMatchObject({ ok: false, kind: "upstream" });
+    if (other.ok) return;
+    expect(other.details).toBeUndefined();
   });
 });
