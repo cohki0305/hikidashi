@@ -36,6 +36,12 @@ describe("画面の上の帯", () => {
     expect(screen.getByText("スキル").getAttribute("aria-current")).toBeNull();
   });
 
+  test("メンバーが現在のときはそちらに付く", () => {
+    render(<AppHeader current="members" />);
+    expect(screen.getByText("メンバー").getAttribute("aria-current")).toBe("page");
+    expect(screen.getByText("メンバー").getAttribute("href")).toBe("/members");
+  });
+
   test("メールを表示する", () => {
     render(<AppHeader current="skills" email="sato@example.com" />);
     expect(screen.getByText("sato@example.com")).toBeTruthy();

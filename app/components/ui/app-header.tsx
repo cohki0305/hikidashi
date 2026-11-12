@@ -1,15 +1,16 @@
 import { Link } from "@tanstack/react-router";
 
-export type NavKey = "skills" | "connect";
+export type NavKey = "skills" | "connect" | "members";
 
 type AppHeaderProps = {
   current: NavKey;
   email?: string;
 };
 
-const NAV_ITEMS: { key: NavKey; href: "/" | "/connect"; label: string }[] = [
+const NAV_ITEMS: { key: NavKey; href: "/" | "/connect" | "/members"; label: string }[] = [
   { key: "skills", href: "/", label: "スキル" },
-  { key: "connect", href: "/connect", label: "つなぎ方" }
+  { key: "connect", href: "/connect", label: "つなぎ方" },
+  { key: "members", href: "/members", label: "メンバー" }
 ];
 
 // 「つなぎ方」の画面のルートはまだ無いので、ナビは通常のリンクにしている。

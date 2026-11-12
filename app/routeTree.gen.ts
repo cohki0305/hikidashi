@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthorizeRouteImport } from './routes/authorize'
 import { Route as ConnectRouteImport } from './routes/connect'
+import { Route as JoinRouteImport } from './routes/join'
+import { Route as MembersRouteImport } from './routes/members'
 import { Route as SkillsNameRouteImport } from './routes/skills.$name'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +31,16 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembersRoute = MembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SkillsNameRoute = SkillsNameRouteImport.update({
   id: '/skills/$name',
   path: '/skills/$name',
@@ -39,12 +51,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
+  '/join': typeof JoinRoute
+  '/members': typeof MembersRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
+  '/join': typeof JoinRoute
+  '/members': typeof MembersRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRoutesById {
@@ -52,20 +68,32 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/authorize': typeof AuthorizeRoute
   '/connect': typeof ConnectRoute
+  '/join': typeof JoinRoute
+  '/members': typeof MembersRoute
   '/skills/$name': typeof SkillsNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/authorize' | '/connect' | '/skills/$name'
+  fullPaths:
+    '/' | '/authorize' | '/connect' | '/join' | '/members' | '/skills/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/authorize' | '/connect' | '/skills/$name'
-  id: '__root__' | '/' | '/authorize' | '/connect' | '/skills/$name'
+  to: '/' | '/authorize' | '/connect' | '/join' | '/members' | '/skills/$name'
+  id:
+    | '__root__'
+    | '/'
+    | '/authorize'
+    | '/connect'
+    | '/join'
+    | '/members'
+    | '/skills/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthorizeRoute: typeof AuthorizeRoute
   ConnectRoute: typeof ConnectRoute
+  JoinRoute: typeof JoinRoute
+  MembersRoute: typeof MembersRoute
   SkillsNameRoute: typeof SkillsNameRoute
 }
 
@@ -92,6 +120,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/members': {
+      id: '/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof MembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/skills/$name': {
       id: '/skills/$name'
       path: '/skills/$name'
@@ -106,6 +148,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthorizeRoute: AuthorizeRoute,
   ConnectRoute: ConnectRoute,
+  JoinRoute: JoinRoute,
+  MembersRoute: MembersRoute,
   SkillsNameRoute: SkillsNameRoute,
 }
 export const routeTree = rootRouteImport

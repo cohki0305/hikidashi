@@ -33,6 +33,13 @@ describe("servePage", () => {
     expect(await response.text()).toBe(INDEX);
   });
 
+  test("メンバーと招待リンクの画面は 200 で画面を返す", async () => {
+    for (const path of ["/members", "/join"]) {
+      const response = await servePage(get(path), fakeAssets());
+      expect(response.status).toBe(200);
+    }
+  });
+
   test("画面の無い道は 404 で同じ画面を返す", async () => {
     const response = await servePage(get("/nope"), fakeAssets());
     expect(response.status).toBe(404);
