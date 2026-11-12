@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { createQueryClient } from "@/app/lib/browser/query-client";
 
 const actualRouter = { ...(await import("@tanstack/react-router")) };
 
@@ -11,21 +13,81 @@ function Outlet() {
   return <p>画面の中身</p>;
 }
 
+function useLocation() {
+  return { pathname: window.location.pathname };
+}
+
 mock.module("@tanstack/react-router", () => ({
   ...actualRouter,
   createRootRoute: (options: object) => ({ ...options, options }),
   HeadContent,
-  Outlet
+  Outlet,
+  useLocation
 }));
 
 const { RootComponent, Route } = await import("./__root");
 
-afterEach(cleanup);
+const realFetch = globalThis.fetch;
+
+afterEach(() => {
+  cleanup();
+  globalThis.fetch = realFetch;
+  window.history.replaceState(null, "", "/");
+});
+
+function setMe(isMember: boolean) {
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ email: "sato@example.test", isMember }), {
+      headers: { "content-type": "application/json" }
+    })) as unknown as typeof fetch;
+}
+
+function renderRoot() {
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <RootComponent />
+    </QueryClientProvider>
+  );
+}
+
+const NOTICE =
+  "hikidashi に入るには招待リンクが要ります。メンバーの人にリンクをもらって開いてください。";
 
 describe("ルートの枠", () => {
-  test("子の画面を Outlet に流す", () => {
-    render(<RootComponent />);
-    expect(screen.getByText("画面の中身")).toBeTruthy();
+  test("子の画面を Outlet に流す", async () => {
+    setMe(true);
+    renderRoot();
+    await waitFor(() => expect(screen.getByText("画面の中身")).toBeTruthy());
+  });
+
+  test("/api/me の読み込み中は子の画面を出さない", () => {
+    globalThis.fetch = (async () => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    renderRoot();
+    expect(screen.getByText("読み込んでいます")).toBeTruthy();
+    expect(screen.queryByText("画面の中身")).toBeNull();
+  });
+
+  test("/api/me の読み込みに失敗したら子の画面を出さない", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: "x" }), { status: 500 })) as unknown as typeof fetch;
+    renderRoot();
+    await waitFor(() => expect(screen.getByText("読み込めませんでした")).toBeTruthy());
+    expect(screen.queryByText("画面の中身")).toBeNull();
+  });
+
+  test("メンバーでなければ案内を出し、画面の中身は出さない", async () => {
+    setMe(false);
+    renderRoot();
+    await waitFor(() => expect(screen.getByText(NOTICE)).toBeTruthy());
+    expect(screen.queryByText("画面の中身")).toBeNull();
+  });
+
+  test("メンバーでなくても /join では中身を出す", async () => {
+    window.history.replaceState(null, "", "/join?key=x");
+    setMe(false);
+    renderRoot();
+    await waitFor(() => expect(screen.getByText("画面の中身")).toBeTruthy());
+    expect(screen.queryByText(NOTICE)).toBeNull();
   });
 
   test("枠の component を Route に渡している", () => {

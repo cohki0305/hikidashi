@@ -1,3 +1,4 @@
+import type { InviteItem, MemberView } from "@/shared/schemas/members";
 import type { SkillDetailResponse, SkillSummary } from "@/shared/schemas/skills";
 
 // 開発用の架空データ。作者も架空の名前。
@@ -112,3 +113,34 @@ export function mockFileBody(path: string): string | null {
 }
 
 export const mockMe = { email: "sato@example.com", isMember: true };
+
+/** 開発用の架空のメンバー。 */
+export const mockMembers: MemberView[] = [
+  {
+    email: "sato@example.com",
+    joinedAt: "2026-11-01T00:00:00.000Z",
+    isOwner: true,
+    isMe: true
+  },
+  {
+    email: "suzuki@example.com",
+    joinedAt: "2026-11-05T00:00:00.000Z",
+    isOwner: false,
+    isMe: false
+  },
+  {
+    email: "tanaka@example.com",
+    joinedAt: "2026-11-08T00:00:00.000Z",
+    isOwner: false,
+    isMe: false
+  }
+];
+
+/** 開発用の架空の招待リンク。 */
+export const mockInvites: InviteItem[] = [
+  {
+    id: "iv-mock-1",
+    createdAt: "2026-11-09T00:00:00.000Z",
+    expiresAt: "2026-11-16T00:00:00.000Z"
+  }
+];

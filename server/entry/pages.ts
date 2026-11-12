@@ -11,7 +11,7 @@ export function isAppPath(pathname: string): boolean {
 }
 
 // 画面のある道。許可の画面は OAuth の頼みを受けて開く。
-const PAGE_PATHS: ReadonlySet<string> = new Set(["/", "/authorize"]);
+const PAGE_PATHS: ReadonlySet<string> = new Set(["/", "/authorize", "/members", "/join"]);
 
 function isPagePath(pathname: string): boolean {
   return PAGE_PATHS.has(pathname);
