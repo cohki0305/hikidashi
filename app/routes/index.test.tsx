@@ -36,7 +36,7 @@ function renderPage(fetchImpl: typeof fetch = mockFetch) {
 }
 
 describe("スキル一覧", () => {
-  test("見出しと説明と 7 件のカードが出る", async () => {
+  test("見出しと説明と 7 件の行が出る", async () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "チームのスキル" })).toBeTruthy();
     expect(
@@ -62,9 +62,10 @@ describe("スキル一覧", () => {
     expect(screen.getByText("「存在しない語」で 0 件")).toBeTruthy();
     expect(screen.getByText("見つかるスキルはありません。")).toBeTruthy();
     expect(screen.queryAllByRole("link", { name: /第\d+版/ }).length).toBe(0);
+    expect(screen.queryByText("作った人")).toBeNull();
   });
 
-  test("Claude Code 専用のカードに印が付き、カードは詳細へのリンクになる", async () => {
+  test("Claude Code 専用の行に印が付き、行は詳細へのリンクになる", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Claude Code 専用")).toBeTruthy());
     const link = screen.getByRole("link", { name: /動画の字幕入れ/ });

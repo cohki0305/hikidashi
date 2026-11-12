@@ -27,3 +27,139 @@ a:hover {
   font-size: 24px;
   font-weight: 700;
 }
+
+/* スキル一覧: 1 件 1 行 */
+.skill-list {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr) 120px 72px 48px;
+  align-items: center;
+  column-gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.skill-row:last-child {
+  border-bottom: none;
+}
+
+a.skill-row:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+a.skill-row:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.skill-row--head {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+.skill-row > span {
+  min-width: 0;
+}
+
+.skill-row__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-row__title {
+  font-weight: 700;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.skill-row--head .skill-row__title {
+  font-weight: 400;
+}
+
+.skill-row__desc {
+  color: var(--color-text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-row__author,
+.skill-row__date,
+.skill-row__version {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skill-row__version {
+  text-align: right;
+}
+
+.skill-chip {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .skill-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "name name version"
+      "desc desc desc"
+      "author date date";
+    row-gap: 4px;
+    padding: 12px 16px;
+  }
+
+  .skill-row--head {
+    display: none;
+  }
+
+  .skill-row__name {
+    grid-area: name;
+  }
+
+  .skill-row__desc {
+    grid-area: desc;
+  }
+
+  .skill-row__author {
+    grid-area: author;
+    font-size: 13px;
+  }
+
+  .skill-row__date {
+    grid-area: date;
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .skill-row__version {
+    grid-area: version;
+    font-size: 12px;
+  }
+}
