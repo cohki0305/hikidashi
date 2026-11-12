@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { meResponseSchema } from "./me";
 
 describe("meResponseSchema", () => {
-  it("メールアドレスを持つ応答を通す", () => {
-    expect(meResponseSchema.safeParse({ email: "member@example.com" }).success).toBe(true);
+  it("メールアドレスとメンバーかどうかを持つ応答を通す", () => {
+    expect(
+      meResponseSchema.safeParse({ email: "member@example.com", isMember: false }).success
+    ).toBe(true);
   });
 
   it("メールアドレスの形でなければ弾く", () => {
@@ -11,6 +13,10 @@ describe("meResponseSchema", () => {
   });
 
   it("email が無ければ弾く", () => {
-    expect(meResponseSchema.safeParse({}).success).toBe(false);
+    expect(meResponseSchema.safeParse({ isMember: true }).success).toBe(false);
+  });
+
+  it("isMember が無ければ弾く", () => {
+    expect(meResponseSchema.safeParse({ email: "member@example.com" }).success).toBe(false);
   });
 });

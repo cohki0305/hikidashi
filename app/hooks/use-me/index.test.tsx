@@ -15,7 +15,9 @@ describe("useMe", () => {
   test("ログイン中のメールを取る", async () => {
     setDefaultFetch(
       (async () =>
-        new Response(JSON.stringify({ email: "sato@example.com" }))) as unknown as typeof fetch
+        new Response(
+          JSON.stringify({ email: "sato@example.com", isMember: true })
+        )) as unknown as typeof fetch
     );
     const client = createQueryClient();
     const wrapper = ({ children }: { children: ReactNode }) => (

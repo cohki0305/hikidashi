@@ -399,6 +399,25 @@ describe("OauthService", () => {
     });
   });
 
+  describe("revokeAllFor", () => {
+    test("大文字小文字を問わず、その人のつながりをすべて取り消す", async () => {
+      const { service, db } = setup();
+      const { code, clientId } = await allowed(service);
+      const tokens = must(await exchange(service, code, clientId));
+
+      expect(await service.revokeAllFor("HANAKO@Example.Test")).toEqual({
+        ok: true,
+        value: undefined
+      });
+
+      expect(await service.authenticate(tokens.accessToken)).toBeNull();
+      expectInvalidGrant(await service.refresh({ refreshToken: tokens.refreshToken, clientId }));
+      const rows = await db.select().from(oauthGrants).all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.revokedAt).toBe("2026-10-20T00:00:00.000Z");
+    });
+  });
+
   describe("authenticate", () => {
     test("知らない値と、1 時間を過ぎた access は null", async () => {
       const { service, advance } = setup();

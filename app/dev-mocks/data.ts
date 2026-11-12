@@ -111,4 +111,4 @@ export function mockFileBody(path: string): string | null {
   return textBodies[path] ?? null;
 }
 
-export const mockMe = { email: "sato@example.com" };
+export const mockMe = { email: "sato@example.com", isMember: true };

@@ -59,7 +59,8 @@ function appWith(over: Partial<OAuthServicePort> = {}) {
       logError: () => {},
       oauth: port,
       appUrl: `${APP_URL}/`,
-      accessVerifier: verify
+      accessVerifier: verify,
+      isMember: async () => true
     }),
     calls
   };

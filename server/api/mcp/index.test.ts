@@ -62,7 +62,8 @@ function build(
           authenticate: async (token) =>
             token === "hkd_at_live" ? { email: "member@example.test" } : null
         },
-        skills
+        skills,
+        isMember: async () => true
       }),
     appUrl: options.appUrl ?? `${APP_URL}/`
   });
@@ -96,6 +97,21 @@ describe("POST /mcp の入口", () => {
     }
   });
 
+  test("メンバーでない人のトークンは 401（外した後も同じ）", async () => {
+    const mcp = new McpService({
+      oauth: {
+        authenticate: async (token) =>
+          token === "hkd_at_live" ? { email: "member@example.test" } : null
+      },
+      skills,
+      isMember: async () => false
+    });
+    const res = await rpc(build({ mcp }), { jsonrpc: "2.0", id: 1, method: "ping" }, LIVE);
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate")).toBe(METADATA);
+  });
+
   test("GET /mcp は 405 で Allow に POST", async () => {
     const res = await build().request("/mcp");
     expect(res.status).toBe(405);
@@ -125,7 +141,8 @@ function buildService() {
       authenticate: async (token) =>
         token === "hkd_at_live" ? { email: "member@example.test" } : null
     },
-    skills
+    skills,
+    isMember: async () => true
   });
 }
 
@@ -283,7 +300,7 @@ describe("取り消した grant のトークン", () => {
       })
     );
     const app = build({
-      mcp: new McpService({ oauth, skills }),
+      mcp: new McpService({ oauth, skills, isMember: async () => true }),
       appUrl: APP_URL
     });
     const headers = { authorization: `Bearer ${tokens.accessToken}` };

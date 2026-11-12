@@ -51,6 +51,17 @@ describe("requireAccess", () => {
     expect(calls).toEqual(["valid-jwt"]);
   });
 
+  it("メールアドレスは小文字にそろえて c.var.email に入れる", async () => {
+    const { verify } = fakeVerifier(ok({ email: "Member@Example.COM" }));
+    const res = await buildApp(verify).request(
+      "/api/secret",
+      { headers: { "Cf-Access-Jwt-Assertion": "valid-jwt" } },
+      {}
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ email: "member@example.com" });
+  });
+
   it("APP_ENV=development のときだけ DEV_ACCESS_EMAIL を本人として通す", async () => {
     const { verify, calls } = fakeVerifier(forbidden("だめ"));
     const res = await buildApp(verify).request(

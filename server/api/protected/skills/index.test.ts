@@ -83,7 +83,12 @@ const verify: AccessVerifier = async (jwt) =>
   jwt === "valid-jwt" ? ok({ email: "member@example.com" }) : forbidden("検証に失敗しました");
 
 function buildApp(service: SkillServicePort) {
-  return createApp({ logError: () => {}, skillService: service, accessVerifier: verify });
+  return createApp({
+    logError: () => {},
+    skillService: service,
+    accessVerifier: verify,
+    isMember: async () => true
+  });
 }
 
 describe("GET /api/skills", () => {

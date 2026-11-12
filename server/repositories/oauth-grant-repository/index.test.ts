@@ -153,6 +153,70 @@ describe("OauthGrantRepository", () => {
     expect(row.value?.revokedAt).toBe(NOW);
   });
 
+  test("メールの大文字小文字を問わず、その人の grant をすべて取り消す", async () => {
+    const { db, repository } = setup();
+    await seedClient(db);
+    await seedGrant(repository, "grant-1", OLD_HASH);
+    await repository.create({
+      id: "grant-2",
+      email: "hanako@example.test",
+      clientId: "client-1",
+      refreshTokenHash: "c".repeat(64),
+      refreshExpiresAt: EXPIRES,
+      createdAt: NOW
+    });
+
+    expect(await repository.revokeByEmail("Hanako@Example.Test", NOW)).toEqual({
+      ok: true,
+      value: undefined
+    });
+
+    for (const id of ["grant-1", "grant-2"]) {
+      const row = await repository.findById(id);
+      expect(row.ok).toBe(true);
+      if (!row.ok) return;
+      expect(row.value?.revokedAt).toBe(NOW);
+    }
+  });
+
+  test("取り消し済みの grant は日時を書き換えない", async () => {
+    const { db, repository } = setup();
+    await seedClient(db);
+    await seedGrant(repository, "grant-1", OLD_HASH);
+    await repository.revoke("grant-1", NOW);
+
+    expect(await repository.revokeByEmail("hanako@example.test", EXPIRES)).toEqual({
+      ok: true,
+      value: undefined
+    });
+
+    const row = await repository.findById("grant-1");
+    expect(row.ok).toBe(true);
+    if (!row.ok) return;
+    expect(row.value?.revokedAt).toBe(NOW);
+  });
+
+  test("ほかの人の grant には触らない", async () => {
+    const { db, repository } = setup();
+    await seedClient(db);
+    await seedGrant(repository, "grant-1", OLD_HASH);
+    await repository.create({
+      id: "grant-2",
+      email: "taro@example.test",
+      clientId: "client-1",
+      refreshTokenHash: "d".repeat(64),
+      refreshExpiresAt: EXPIRES,
+      createdAt: NOW
+    });
+
+    await repository.revokeByEmail("hanako@example.test", NOW);
+
+    const other = await repository.findById("grant-2");
+    expect(other.ok).toBe(true);
+    if (!other.ok) return;
+    expect(other.value?.revokedAt).toBeNull();
+  });
+
   test("最後に使った日時は 5 分たってからだけ書き換える", async () => {
     const { db, repository } = setup();
     await seedClient(db);

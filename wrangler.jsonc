@@ -16,6 +16,8 @@
     // OAuth と MCP の入口が名乗る自分の URL。デプロイ後の URL を入れる。
     // 例: https://hikidashi.<サブドメイン>.workers.dev（末尾の / は付けない）。未設定ならそれらの入口は載せない（404）。
     "APP_URL": "https://hikidashi.<サブドメイン>.workers.dev",
+    // 常にメンバーとみなす人（カンマ区切り）。ここに居る人は外せない。空なら誰も入れない。
+    "OWNER_EMAILS": "<管理する人のメールアドレス>",
     // R2 の S3 互換 API の署名に使う。Cloudflare のアカウント ID を入れる（R2 の画面に出る）。
     // キー（R2_ACCESS_KEY_ID・R2_SECRET_ACCESS_KEY）は Worker のシークレット。
     "R2_ACCOUNT_ID": "<アカウント ID>",

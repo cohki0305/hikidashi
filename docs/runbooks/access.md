@@ -5,6 +5,9 @@ hikidashi は `https://hikidashi.<サブドメイン>.workers.dev` で公開し�
 Claude がつなぐ道だけを **Bypass** のアプリ 1 つで外します。
 新しい画面や API を足しても、何もしなければログインが要る側に入ります。
 
+Access が確かめるのは「その人が本人かどうか」だけです。
+中身を使えるかどうか（メンバーかどうか）は hikidashi 側で決めます。
+
 ## 1. Worker 全体を守る設定は使わない
 
 Worker の画面にある「Protect this Worker behind Access」は使いません。
@@ -17,8 +20,14 @@ Worker の画面にある「Protect this Worker behind Access」は使いませ�
 2. 「Add an application」から「Self-hosted」を選びます。
 3. アプリの名前を「hikidashi」にします。
 4. 宛先（destinations）に `hikidashi.<サブドメイン>.workers.dev` を、道を付けずに 1 つだけ入れます。
-5. ポリシーを「Allow」にし、使ってよい人のメールアドレスを一覧で並べます（グループでもかまいません）。
+5. ポリシーを「Allow」にし、Include を「Everyone」にします。メールのコードで本人確認できた人は、この時点では誰でも入口を通れます。
 6. 保存したら、アプリの概要に出る AUD を `wrangler.production.jsonc` の `ACCESS_AUD` に入れます。
+
+入口を通れる人と、中身を使える人は別です。中身を使えるのは hikidashi のメンバーだけです。
+メンバーの出し入れは 5 節の画面で行います。
+
+すでにメールアドレスの一覧で許可していた場合は、先に新しい版を公開して動くことを確かめてから、
+ポリシーを「Include: Everyone」に変えます。逆にすると、新しい版が出る前に誰でも入れる時間ができます。
 
 画面（`/`・`/skills/*`・`/connect`・`/authorize`）、画面が使う API（`/api/*`）、
 Claude からのつなぐ頼みを受ける `/oauth/authorize` は、すべてこのアプリで守られます。
@@ -57,6 +66,11 @@ Bypass のアプリは Access の JWT を出しません。
 
 ## 5. メンバーを出し入れする
 
-使える人を増やす・減らすときは、守るアプリのポリシーだけを変えます。
+使える人を増やす・減らすときは、hikidashi の画面「メンバー」で行います。
+Access のポリシーは「Include: Everyone」のまま変えません。入口は本人確認だけを担当します。
+
+- 人を増やすときは「メンバー」で招待リンクを作り、そのリンクを本人に渡します。リンクを開いた人がメンバーになります。
+- 人を減らすときは「メンバー」でその人を外します。外した人は、それまでの許可がすぐに効かなくなります。
+- 最初のメンバーは `wrangler.production.jsonc` の `OWNER_EMAILS` に書いた人です。この人は常にメンバーで、外せません。
+
 Bypass のアプリは誰でも通すので、ポリシーを変える必要はありません。
-hikidashi 側に利用者の一覧は持たないので、ほかに変える場所はありません。

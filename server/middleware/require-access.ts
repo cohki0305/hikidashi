@@ -31,7 +31,7 @@ export function requireAccess(verify: AccessVerifier) {
 
     const env: AccessEnv = c.env ?? {};
     if (env.APP_ENV === "development" && env.DEV_ACCESS_EMAIL) {
-      c.set("email", env.DEV_ACCESS_EMAIL);
+      c.set("email", env.DEV_ACCESS_EMAIL.toLowerCase());
       return next();
     }
 
@@ -41,7 +41,7 @@ export function requireAccess(verify: AccessVerifier) {
     const result = await verify(jwt);
     if (!result.ok) return unauthorized(c);
 
-    c.set("email", result.value.email);
+    c.set("email", result.value.email.toLowerCase());
     return next();
   });
 }

@@ -1,3 +1,5 @@
+export * from "./members";
+export { inviteLinks, members } from "./members";
 export * from "./oauth";
 export {
   oauthAccessTokens,
@@ -9,6 +11,7 @@ export {
 export * from "./skills";
 export { skillFiles, skills, skillVersions, uploads } from "./skills";
 
+import { inviteLinks, members } from "./members";
 import {
   oauthAccessTokens,
   oauthClients,
@@ -28,5 +31,7 @@ export const schema = {
   oauthRequests,
   oauthGrants,
   oauthAccessTokens,
-  oauthUsedRefreshTokens
+  oauthUsedRefreshTokens,
+  members,
+  inviteLinks
 };

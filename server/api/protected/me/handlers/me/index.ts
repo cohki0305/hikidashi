@@ -4,7 +4,9 @@ import type { MeResponse } from "@/shared/schemas/me";
 
 const factory = createFactory();
 
-export const index = factory.createHandlers((c) => {
-  const body: MeResponse = { email: c.get("email") };
+export const index = factory.createHandlers(async (c) => {
+  const email = c.get("email");
+  const isMember = await c.get("isMember")(email);
+  const body: MeResponse = { email, isMember };
   return ok(c, body);
 });

@@ -28,6 +28,7 @@ function build(options: { port?: Partial<OAuthRequestServicePort>; withService?:
   const app = createApp({
     logError: () => {},
     accessVerifier: verify,
+    isMember: async () => true,
     ...(options.withService === false ? {} : { oauth: port })
   });
   return { app, calls };
