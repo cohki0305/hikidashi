@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { postJson } from "@/app/lib/api";
 import { redeemInviteResponseSchema } from "@/shared/schemas/members";
 
 const INVALID_MESSAGE = "このリンクは使えません。招待した人に新しいリンクをもらってください。";
@@ -8,30 +9,14 @@ const FAILED_MESSAGE = "うまくいきませんでした。時間をおいて�
 type Outcome = "joined" | "invalid" | "failed";
 
 async function redeem(key: string): Promise<Outcome> {
-  let response: Response;
-  try {
-    response = await fetch("/api/invites/redemptions", {
-      method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ key })
-    });
-  } catch {
-    return "failed";
-  }
-  if (response.status >= 500) return "failed";
-  if (!response.ok) return "invalid";
-  try {
-    return redeemInviteResponseSchema.safeParse(await response.json()).success
-      ? "joined"
-      : "failed";
-  } catch {
-    return "failed";
-  }
+  const result = await postJson("/api/invites/redemptions", { key }, redeemInviteResponseSchema);
+  if (result.ok) return "joined";
+  return result.kind === "upstream" ? "failed" : "invalid";
 }
 
 // 毎回同じ関数にして、画面の描き直しで確認をやり直さないようにする。
 function defaultNavigate(url: string) {
-  window.location.assign(url);
+  window.location.replace(url);
 }
 
 type JoinPageProps = {
@@ -49,7 +34,7 @@ export function JoinPage({ navigateTo = defaultNavigate }: JoinPageProps = {}) {
     let cancelled = false;
     redeem(key).then((outcome) => {
       if (cancelled) return;
-      if (outcome === "joined") navigateTo("/members");
+      if (outcome === "joined") navigateTo("/");
       else setMessage(outcome === "invalid" ? INVALID_MESSAGE : FAILED_MESSAGE);
     });
     return () => {

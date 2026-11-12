@@ -29,11 +29,24 @@ describe("招待リンクを使う画面", () => {
     const fn = setFetch(200, { joined: true });
     const navigateTo = mock((_url: string) => {});
     render(<JoinPage navigateTo={navigateTo} />);
-    await waitFor(() => expect(navigateTo).toHaveBeenCalledWith("/members"));
+    await waitFor(() => expect(navigateTo).toHaveBeenCalledWith("/"));
     const [url, init] = fn.mock.calls[0] ?? [];
     expect(url).toBe("/api/invites/redemptions");
     expect(init?.method).toBe("POST");
     expect(JSON.parse(String(init?.body))).toEqual({ key: "hkd_iv_test" });
+  });
+
+  test("成功したら履歴を置き換えてスキル一覧へ移る", async () => {
+    window.history.replaceState(null, "", "/join?key=hkd_iv_test");
+    setFetch(200, { joined: true });
+    const replace = mock((_url: string | URL) => {});
+    Object.defineProperty(window.location, "replace", { value: replace, configurable: true });
+    try {
+      render(<JoinPage />);
+      await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    } finally {
+      Reflect.deleteProperty(window.location, "replace");
+    }
   });
 
   test("すでにメンバーでも同じく移る", async () => {
@@ -41,7 +54,7 @@ describe("招待リンクを使う画面", () => {
     setFetch(200, { joined: false });
     const navigateTo = mock((_url: string) => {});
     render(<JoinPage navigateTo={navigateTo} />);
-    await waitFor(() => expect(navigateTo).toHaveBeenCalledWith("/members"));
+    await waitFor(() => expect(navigateTo).toHaveBeenCalledWith("/"));
   });
 
   test("使えないリンクなら理由を分けずに案内を出す", async () => {

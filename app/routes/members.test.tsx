@@ -33,7 +33,12 @@ const json = (body: unknown, status = 200) =>
     headers: { "content-type": "application/json" }
   });
 
-function setup() {
+type SetupOptions = {
+  members?: () => Promise<Response>;
+  invites?: () => Promise<Response>;
+};
+
+function setup(options: SetupOptions = {}) {
   const state = {
     members: [
       {
@@ -65,8 +70,10 @@ function setup() {
     const method = init?.method ?? "GET";
     calls.push({ method, path });
     if (path === "/api/me") return json({ email: "me@example.test", isMember: true });
-    if (path === "/api/members" && method === "GET") return json({ members: state.members });
-    if (path === "/api/invites" && method === "GET") return json({ invites: state.invites });
+    if (path === "/api/members" && method === "GET")
+      return options.members ? options.members() : json({ members: state.members });
+    if (path === "/api/invites" && method === "GET")
+      return options.invites ? options.invites() : json({ invites: state.invites });
     if (path === "/api/invites" && method === "POST")
       return json(
         {
@@ -98,11 +105,32 @@ function setup() {
 }
 
 describe("メンバーの画面", () => {
-  test("メンバーと使えるリンクが並ぶ", async () => {
+  test("メンバーと自分が作ったリンクが並ぶ", async () => {
     setup();
     await waitFor(() => expect(screen.getByText("hanako@example.test")).toBeTruthy());
     expect(screen.getByText("owner@example.test")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "自分が作ったリンク" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "止める" })).toBeTruthy();
+  });
+
+  test("招待リンクを読み込めなかったら、無いとは書かない", async () => {
+    setup({ invites: async () => json({ error: "x" }, 500) });
+    await waitFor(() => expect(screen.getByText("読み込めませんでした。")).toBeTruthy());
+    expect(screen.queryByText("自分が作ったリンクはありません。")).toBeNull();
+  });
+
+  test("招待リンクの読み込み中は、無いとは書かない", async () => {
+    setup({ invites: () => new Promise<Response>(() => {}) });
+    await waitFor(() => expect(screen.getByText("hanako@example.test")).toBeTruthy());
+    expect(screen.getByText("読み込んでいます…")).toBeTruthy();
+    expect(screen.queryByText("自分が作ったリンクはありません。")).toBeNull();
+  });
+
+  test("メンバーの読み込み中は、読み込み中と出す", async () => {
+    setup({ members: () => new Promise<Response>(() => {}) });
+    await waitFor(() => expect(screen.getByRole("button", { name: "止める" })).toBeTruthy());
+    expect(screen.getByText("読み込んでいます…")).toBeTruthy();
+    expect(screen.queryByText("hanako@example.test")).toBeNull();
   });
 
   test("最初のメンバーと自分には「外す」が出ない", async () => {

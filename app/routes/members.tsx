@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageShell } from "@/app/components/ui/page-shell";
 import { useMe } from "@/app/hooks/use-me";
-import { getJson } from "@/app/lib/api";
+import { getJson, sendRequest } from "@/app/lib/api";
 import {
   type CreatedInvite,
   createdInviteSchema,
@@ -62,12 +62,8 @@ function formatDate(iso: string): string {
 }
 
 async function send(method: "POST" | "DELETE", path: string): Promise<Response | null> {
-  try {
-    const response = await fetch(path, { method, headers: { accept: "application/json" } });
-    return response.ok ? response : null;
-  } catch {
-    return null;
-  }
+  const result = await sendRequest(method, path);
+  return result.ok ? result.value : null;
 }
 
 /** 招待リンクを作る・止める、メンバーを見る・外す画面。 */
@@ -202,8 +198,12 @@ export function MembersPage() {
         </section>
 
         <section style={cardStyle}>
-          <h2 style={h2Style}>使えるリンク</h2>
-          {inviteList.length === 0 ? <p style={mutedStyle}>使えるリンクはありません。</p> : null}
+          <h2 style={h2Style}>自分が作ったリンク</h2>
+          {invites.isLoading ? <p style={mutedStyle}>読み込んでいます…</p> : null}
+          {invites.data?.ok === false ? <p style={mutedStyle}>読み込めませんでした。</p> : null}
+          {invites.data?.ok && inviteList.length === 0 ? (
+            <p style={mutedStyle}>自分が作ったリンクはありません。</p>
+          ) : null}
           {inviteList.map((invite) => (
             <div key={invite.id} style={rowStyle}>
               <span style={{ fontSize: 14 }}>
@@ -220,10 +220,12 @@ export function MembersPage() {
             </div>
           ))}
           <p style={mutedStyle}>止めても、そのリンクで入った人はそのままです。</p>
+          <p style={mutedStyle}>メンバーを外すと、その人が作ったリンクも止まります。</p>
         </section>
 
         <section style={cardStyle}>
           <h2 style={h2Style}>メンバー</h2>
+          {members.isLoading ? <p style={mutedStyle}>読み込んでいます…</p> : null}
           {members.data?.ok === false ? <p style={mutedStyle}>読み込めませんでした。</p> : null}
           {memberList.map((member) => (
             <div key={member.email} style={rowStyle}>

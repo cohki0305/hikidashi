@@ -1,8 +1,13 @@
-import { createRootRoute, HeadContent, Outlet } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, useLocation } from "@tanstack/react-router";
 import { useMe } from "@/app/hooks/use-me";
 
-/** メンバーでない人に、どの画面でも出す案内。 */
-function NotMemberNotice() {
+type NoticeProps = {
+  title: string;
+  message: string;
+};
+
+/** 画面の代わりに出す案内。 */
+function Notice({ title, message }: NoticeProps) {
   return (
     <div
       style={{
@@ -28,24 +33,45 @@ function NotMemberNotice() {
           gap: 12
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>招待リンクが必要です</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{title}</h1>
         <p role="alert" style={{ margin: 0, lineHeight: 1.7 }}>
-          hikidashi に入るには招待リンクが要ります。メンバーの人にリンクをもらって開いてください。
+          {message}
         </p>
       </section>
     </div>
   );
 }
 
+/** メンバーでない人に、どの画面でも出す案内。 */
+function NotMemberNotice() {
+  return (
+    <Notice
+      title="招待リンクが必要です"
+      message="hikidashi に入るには招待リンクが要ります。メンバーの人にリンクをもらって開いてください。"
+    />
+  );
+}
+
 /** すべての画面を包む枠。画面ごとの題名と、選ばれた画面を出す。メンバーでなければ案内を出す。 */
 export function RootComponent() {
   const me = useMe();
-  const notMember = me.data?.ok === true && !me.data.value.isMember;
-  const onJoin = window.location.pathname === "/join";
+  const location = useLocation();
+  const onJoin = location.pathname === "/join";
+  const isMember = me.data?.ok === true && me.data.value.isMember;
   return (
     <>
       <HeadContent />
-      {notMember && !onJoin ? <NotMemberNotice /> : <Outlet />}
+      {onJoin ? (
+        <Outlet />
+      ) : me.data === undefined ? (
+        <Notice title="読み込んでいます" message="少しお待ちください。" />
+      ) : me.data.ok === false ? (
+        <Notice title="読み込めませんでした" message="時間をおいて画面を開き直してください。" />
+      ) : isMember ? (
+        <Outlet />
+      ) : (
+        <NotMemberNotice />
+      )}
     </>
   );
 }

@@ -13,11 +13,16 @@ function Outlet() {
   return <p>画面の中身</p>;
 }
 
+function useLocation() {
+  return { pathname: window.location.pathname };
+}
+
 mock.module("@tanstack/react-router", () => ({
   ...actualRouter,
   createRootRoute: (options: object) => ({ ...options, options }),
   HeadContent,
-  Outlet
+  Outlet,
+  useLocation
 }));
 
 const { RootComponent, Route } = await import("./__root");
@@ -49,10 +54,25 @@ const NOTICE =
   "hikidashi に入るには招待リンクが要ります。メンバーの人にリンクをもらって開いてください。";
 
 describe("ルートの枠", () => {
-  test("子の画面を Outlet に流す", () => {
+  test("子の画面を Outlet に流す", async () => {
     setMe(true);
     renderRoot();
-    expect(screen.getByText("画面の中身")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("画面の中身")).toBeTruthy());
+  });
+
+  test("/api/me の読み込み中は子の画面を出さない", () => {
+    globalThis.fetch = (async () => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    renderRoot();
+    expect(screen.getByText("読み込んでいます")).toBeTruthy();
+    expect(screen.queryByText("画面の中身")).toBeNull();
+  });
+
+  test("/api/me の読み込みに失敗したら子の画面を出さない", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: "x" }), { status: 500 })) as unknown as typeof fetch;
+    renderRoot();
+    await waitFor(() => expect(screen.getByText("読み込めませんでした")).toBeTruthy());
+    expect(screen.queryByText("画面の中身")).toBeNull();
   });
 
   test("メンバーでなければ案内を出し、画面の中身は出さない", async () => {
