@@ -9,6 +9,8 @@ Cloudflare の管理画面と、手元のターミナルで作業します。公
 - 手元で `bun install` を済ませる。
 - `bunx wrangler login` で Cloudflare にログインする。
 - `<サブドメイン>` は、Cloudflare の管理画面「Workers & Pages」で確認できる workers.dev のサブドメインに読み替える。
+- `wrangler.jsonc` を `wrangler.production.jsonc` に写す（`cp wrangler.jsonc wrangler.production.jsonc`）。本番の値はこの写しにだけ書く。このファイルは git に入れない（`.gitignore` 済み）。
+- 写しの先頭（`"name"` の次の行）に、使う Cloudflare のアカウントの `"account_id"` を足す。ログイン中に複数のアカウントが見えても、ここに出る。
 
 ## 1. D1 を作る
 
@@ -18,14 +20,14 @@ Cloudflare の管理画面と、手元のターミナルで作業します。公
 bunx wrangler d1 create hikidashi
 ```
 
-表示された `database_id` を、`wrangler.jsonc` の `d1_databases` にある `database_id` の `<あとで作る>` と置き換えます。
+表示された `database_id` を、`wrangler.production.jsonc` の `d1_databases` にある `database_id` に入れます。
 
 ## 2. マイグレーションを当てる
 
 作った D1 にテーブルを作ります。
 
 ```sh
-bunx wrangler d1 migrations apply hikidashi --remote
+bun run db:migrate:prod
 ```
 
 `--remote` を忘れないでください。忘れると手元の D1 だけに入り、本番には入りません。
@@ -39,7 +41,7 @@ bunx wrangler d1 migrations apply hikidashi --remote
 bunx wrangler r2 bucket create hikidashi-skills
 ```
 
-バケットの名前は `wrangler.jsonc` の `R2_BUCKET_NAME` と合わせます。
+バケットの名前は `wrangler.production.jsonc` の `R2_BUCKET_NAME` と合わせます。
 
 ## 4. R2 の API トークンを作る
 
@@ -60,9 +62,9 @@ bunx wrangler secret put R2_ACCESS_KEY_ID
 bunx wrangler secret put R2_SECRET_ACCESS_KEY
 ```
 
-それぞれ、入力を求められたら手元で控えた値を貼ります。キーの値を `wrangler.jsonc` やリポジトリには書きません。
+それぞれ、入力を求められたら手元で控えた値を貼ります。キーの値はどの設定ファイルにも書きません。
 
-`wrangler.jsonc` の `vars` は次の値を入れます。
+`wrangler.production.jsonc` の `vars` に次の値を入れます。
 
 | 名前                 | 入れる値                                                               |
 | -------------------- | ---------------------------------------------------------------------- |
@@ -74,21 +76,21 @@ bunx wrangler secret put R2_SECRET_ACCESS_KEY
 ## 6. Access のアプリを作る
 
 ホスト全体を守るアプリと、Claude がつなぐ道を外す Bypass のアプリの 2 つを作ります。手順は [access.md](./access.md) にあります。
-守るアプリの AUD を、`wrangler.jsonc` の `ACCESS_AUD` に入れます。
+守るアプリの AUD を、`wrangler.production.jsonc` の `ACCESS_AUD` に入れます。
 
 ## 7. 公開する
 
 先に設定が通るかを、本番に出さずに確かめます。
 
 ```sh
-bun run build
+HIKIDASHI_WRANGLER_CONFIG=wrangler.production.jsonc bunx vite build
 bunx wrangler deploy --dry-run
 ```
 
-問題が無ければ公開します。
+問題が無ければ公開します（本番の値でビルドし直してから公開します）。
 
 ```sh
-bunx wrangler deploy
+bun run deploy
 ```
 
 ## 8. 公開した後に確かめる

@@ -26,7 +26,8 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    cloudflare()
+    // 本番のビルドは HIKIDASHI_WRANGLER_CONFIG=wrangler.production.jsonc で本番の値を読む
+    cloudflare({ configPath: process.env.HIKIDASHI_WRANGLER_CONFIG })
   ],
   resolve: {
     tsconfigPaths: true

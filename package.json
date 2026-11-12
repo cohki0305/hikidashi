@@ -35,6 +35,8 @@
     "build": "vite build",
     "dev:seed": "bun run scripts/dev/seed-local.ts",
     "dev:server": "wrangler dev",
+    "deploy": "HIKIDASHI_WRANGLER_CONFIG=wrangler.production.jsonc vite build && wrangler deploy",
+    "db:migrate:prod": "wrangler d1 migrations apply hikidashi --remote --config wrangler.production.jsonc",
     "cf:types": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "postinstall": "lefthook install"

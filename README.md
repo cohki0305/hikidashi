@@ -1,6 +1,8 @@
 # hikidashi
 
-チームのスキルを Claude の会話だけで配る社内向けサービス。
+チームのスキルを Claude の会話だけで配る、自分たちで動かすサービス。
+
+公開の手順は [docs/runbooks/deploy.md](docs/runbooks/deploy.md)、入口の守り方は [docs/runbooks/access.md](docs/runbooks/access.md) にある。
 
 - Web アプリ: React + Vite + TanStack Router / Query（`app/`）
 - サーバー: Hono（Cloudflare Workers、`server/`）
@@ -70,3 +72,7 @@ bun run build  # ビルドのときにも生成され直す
 - テストは bun:test で、実装の隣に `*.test.ts` / `*.test.tsx` として置く。
 - 1 つのテストだけを走らせるときは、対象のファイルを明示する（例: `bun test ./server/app.test.ts`）。
 - 共通部品と約束は [tests/CLAUDE.md](./tests/CLAUDE.md) にある。
+
+## ライセンス
+
+MIT（[LICENSE](LICENSE)）
