@@ -38,7 +38,7 @@ a:hover {
 
 .skill-row {
   display: grid;
-  grid-template-columns: minmax(0, 240px) minmax(0, 1fr) 120px 72px 48px;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr) minmax(0, 190px) 72px 48px;
   align-items: center;
   column-gap: 16px;
   padding: 12px 20px;
@@ -126,11 +126,10 @@ a.skill-row:focus-visible {
 
 @media (max-width: 720px) {
   .skill-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "name name version"
-      "desc desc desc"
-      "author date date";
+      "name date"
+      "desc desc";
     row-gap: 4px;
     padding: 12px 16px;
   }
@@ -147,19 +146,14 @@ a.skill-row:focus-visible {
     grid-area: desc;
   }
 
-  .skill-row__author {
-    grid-area: author;
-    font-size: 13px;
+  .skill-row__author,
+  .skill-row__version {
+    display: none;
   }
 
   .skill-row__date {
     grid-area: date;
     font-size: 13px;
     text-align: right;
-  }
-
-  .skill-row__version {
-    grid-area: version;
-    font-size: 12px;
   }
 }
