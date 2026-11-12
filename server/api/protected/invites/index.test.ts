@@ -237,10 +237,16 @@ describe("DELETE /api/invites/:id", () => {
   test("他の人が作ったリンクの id でも Service に渡す（止められる）", async () => {
     const fake = fakeMemberService();
 
-    const response = await deleteInvite(build({ service: fake.service }), "someone-elses", HANAKO);
+    const response = await deleteInvite(
+      build({ service: fake.service }),
+      "other-members-link",
+      HANAKO
+    );
 
     expect(response.status).toBe(200);
-    expect(fake.calls).toEqual([{ method: "revokeInvite", email: HANAKO, id: "someone-elses" }]);
+    expect(fake.calls).toEqual([
+      { method: "revokeInvite", email: HANAKO, id: "other-members-link" }
+    ]);
   });
 
   test("知らないリンクは 404", async () => {
