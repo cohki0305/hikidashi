@@ -9,7 +9,7 @@ const factory = createFactory<MembersEnv>();
 
 /** 有効なメンバーの一覧。自分かどうかを添えて、入った日の新しい順に返す。 */
 export const index = factory.createHandlers(async (c) => {
-  const result = await c.get("memberService").list();
+  const result = await c.get("memberService").list(c.var.email);
   if (!result.ok) return failure(c, result);
   const email = c.var.email.toLowerCase();
   const body: MembersResponse = {

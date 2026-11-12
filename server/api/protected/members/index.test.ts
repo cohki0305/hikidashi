@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { MemberServicePort } from "@/server/api/protected/invites";
+import type { MemberServicePort } from "@/server/api/protected/members";
 import { createApp } from "@/server/app";
 import type { AccessVerifier } from "@/server/lib/access/verify-access-jwt";
 import { forbidden, notFound, ok, type Result } from "@/server/lib/result";

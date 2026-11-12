@@ -4,8 +4,11 @@ import { failure } from "@/server/lib/http";
 import { notFound } from "@/server/lib/result";
 import type { MemberService } from "@/server/services/member-service";
 
-/** メンバー一覧と外す受け持ちの口。実体は bootstrap が組み立てて注入する。 */
-export type MemberServicePort = Pick<MemberService, "list" | "remove">;
+/** メンバーと招待の入口が使う Service の口。実体は bootstrap が組み立てて注入する。 */
+export type MemberServicePort = Pick<
+  MemberService,
+  "list" | "remove" | "redeem" | "createInvite" | "listInvites" | "revokeInvite"
+>;
 
 export type MembersEnv = { Variables: { memberService: MemberServicePort } };
 

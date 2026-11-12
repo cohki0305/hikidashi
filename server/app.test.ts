@@ -120,6 +120,27 @@ describe("メンバーでない人の入口", () => {
     expect(await res.json()).toEqual({ email: "member@example.com", isMember: false });
   });
 
+  it("招待の引き換えは POST だけを除外し、DELETE は 403 にする", async () => {
+    const app = createApp({
+      ...fakeDeps(),
+      accessVerifier: verify,
+      isMember: denyMember()
+    });
+
+    const post = await app.request("/api/invites/redemptions", {
+      method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": "valid-jwt" }
+    });
+    expect(post.status).toBe(404);
+
+    const del = await app.request("/api/invites/redemptions", {
+      method: "DELETE",
+      headers: { "Cf-Access-Jwt-Assertion": "valid-jwt" }
+    });
+    expect(del.status).toBe(403);
+    expect(await del.json()).toEqual({ error: "not_member" });
+  });
+
   it("/oauth/authorize は 403 で、許可の頼みを作らない", async () => {
     let started = 0;
     const res = await createApp({

@@ -2,7 +2,6 @@ import type { SkillDb } from "@/server/db";
 import { type AccessVerifier, createAccessVerifier } from "@/server/lib/access/verify-access-jwt";
 import { issuerOf } from "@/server/lib/oauth/issuer";
 import { type R2S3Config, r2S3ConfigFrom } from "@/server/lib/r2/presign";
-import { ok } from "@/server/lib/result";
 import { InviteLinkRepository } from "@/server/repositories/invite-link-repository";
 import { MemberRepository } from "@/server/repositories/member-repository";
 import { OauthAccessTokenRepository } from "@/server/repositories/oauth-access-token-repository";
@@ -128,16 +127,13 @@ export function ownerEmailsFromEnv(env: BootstrapEnv): string[] {
 }
 
 /** DB の束縛からメンバーの service を組み立てる。DB が無ければ undefined。 */
-export function memberServiceFromEnv(
-  env: BootstrapEnv,
-  oauth?: Pick<OauthService, "revokeAllFor">
-): MemberService | undefined {
+export function memberServiceFromEnv(env: BootstrapEnv): MemberService | undefined {
   if (!env.DB) return undefined;
   const db = createSkillDb(env.DB);
   return new MemberService({
     members: new MemberRepository(db),
     inviteLinks: new InviteLinkRepository(db),
-    revokeGrantsFor: async (email) => (oauth ? oauth.revokeAllFor(email) : ok(undefined)),
+    grants: new OauthGrantRepository(db),
     ownerEmails: ownerEmailsFromEnv(env),
     appUrl: appUrlFromEnv(env)
   });
@@ -166,7 +162,7 @@ export function bootstrap(
   const skillService = skillServiceFromEnv(env);
   const oauthService = oauthServiceFromEnv(env);
   const publishService = publishServiceFromEnv(env);
-  const memberService = memberServiceFromEnv(env, oauthService);
+  const memberService = memberServiceFromEnv(env);
   const isMember = memberService
     ? (email: string) => memberService.isMember(email)
     : async () => false;

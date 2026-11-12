@@ -6,6 +6,9 @@ import { ok, type Result, upstream } from "@/server/lib/result";
 /** invite_links テーブルの 1 行。 */
 export type InviteLink = typeof inviteLinks.$inferSelect;
 
+/** batch にまとめる書き込み 1 文。 */
+export type InviteLinkBatchStatement = { execute: () => Promise<unknown> };
+
 /** メールは小文字にそろえて保存・比較する。 */
 function normalizeEmail(email: string): string {
   return email.toLowerCase();
@@ -56,6 +59,14 @@ export class InviteLinkRepository {
     } catch {
       return upstream("招待リンクの一覧を読めませんでした");
     }
+  }
+
+  /** その人が作った、まだ取り消していないリンクをすべて取り消す文。 */
+  revokeByCreatorStatement(email: string, revokedAt: string): InviteLinkBatchStatement {
+    return this.db
+      .update(inviteLinks)
+      .set({ revokedAt })
+      .where(and(eq(inviteLinks.createdBy, normalizeEmail(email)), isNull(inviteLinks.revokedAt)));
   }
 
   /** 取り消す。まだ取り消していないリンクのときだけ true。 */

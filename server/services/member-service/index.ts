@@ -2,6 +2,7 @@ import { hashToken, toBase64Url } from "@/server/lib/oauth/token";
 import { forbidden, invalid, notFound, ok, type Result } from "@/server/lib/result";
 import type { InviteLinkRepository } from "@/server/repositories/invite-link-repository";
 import type { MemberRepository } from "@/server/repositories/member-repository";
+import type { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
 import type { CreatedInvite, InviteItem, MemberItem } from "@/shared/schemas/members";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -16,10 +17,16 @@ const lower = (email: string) => email.toLowerCase();
 const generateInviteKey = () => `hkd_iv_${toBase64Url(crypto.getRandomValues(new Uint8Array(32)))}`;
 
 export type MemberServiceDeps = {
-  members: Pick<MemberRepository, "find" | "listActive" | "upsertJoined" | "markRemoved">;
-  inviteLinks: Pick<InviteLinkRepository, "create" | "findByKeyHash" | "listByCreator" | "revoke">;
-  /** 外した人の OAuth のつながりをすべて取り消す。 */
-  revokeGrantsFor: (email: string) => Promise<Result<void>>;
+  members: Pick<
+    MemberRepository,
+    "find" | "listActive" | "upsertJoined" | "markRemoved" | "markRemovedStatement" | "commit"
+  >;
+  inviteLinks: Pick<
+    InviteLinkRepository,
+    "create" | "findByKeyHash" | "listByCreator" | "revoke" | "revokeByCreatorStatement"
+  >;
+  /** 外した人の OAuth のつながりをすべて取り消す文を作る。 */
+  grants: Pick<OauthGrantRepository, "revokeByEmailStatement">;
   /** 常にメンバーとみなす人。外せない。 */
   ownerEmails: readonly string[];
   now?: () => Date;
@@ -113,8 +120,11 @@ export class MemberService {
     return ok({ joined: true });
   }
 
-  /** 有効なメンバーとオーナーを、入った日の新しい順に返す。 */
-  async list(): Promise<Result<MemberItem[]>> {
+  /** 有効なメンバーとオーナーを、入った日の新しい順に返す。メンバーだけが見られる。 */
+  async list(byEmail: string): Promise<Result<MemberItem[]>> {
+    if (!(await this.isMember(byEmail)))
+      return forbidden("メンバー一覧を見られるのはメンバーだけです");
+
     const active = await this.deps.members.listActive();
     if (!active.ok) return active;
 
@@ -139,6 +149,8 @@ export class MemberService {
   /** メンバーを外す。オーナーと自分は外せない。 */
   async remove(byEmail: string, target: string): Promise<Result<void>> {
     const actor = lower(byEmail);
+    if (!(await this.isMember(actor))) return forbidden("メンバーを外せるのはメンバーだけです");
+
     const email = lower(target);
     if (this.owners.has(email)) return forbidden("最初のメンバーは外せません");
     if (email === actor) return forbidden("自分は外せません");
@@ -148,16 +160,13 @@ export class MemberService {
     if (found.value === null || found.value.removedAt !== null)
       return notFound("そのメンバーは見つかりません");
 
-    const removed = await this.deps.members.markRemoved({
-      email,
-      removedAt: this.now().toISOString(),
-      removedBy: actor
-    });
-    if (!removed.ok) return removed;
-    if (!removed.value) return notFound("そのメンバーは見つかりません");
-
-    const revoked = await this.deps.revokeGrantsFor(email);
-    if (!revoked.ok) return revoked;
+    const now = this.now().toISOString();
+    const committed = await this.deps.members.commit([
+      this.deps.members.markRemovedStatement({ email, removedAt: now, removedBy: actor }),
+      this.deps.inviteLinks.revokeByCreatorStatement(email, now),
+      this.deps.grants.revokeByEmailStatement(email, now)
+    ]);
+    if (!committed.ok) return committed;
     return ok(undefined);
   }
 

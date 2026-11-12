@@ -38,7 +38,10 @@ export type AppDeps = {
 const denyAccess: AccessVerifier = async () => forbidden("Access の検証器が設定されていません");
 
 /** メンバーでなくても通す道。本人確認そのものと、招待を使うところだけ。 */
-const MEMBER_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/me", "/api/invites/redemptions"]);
+const MEMBER_EXEMPT_ROUTES: ReadonlySet<string> = new Set([
+  "GET /api/me",
+  "POST /api/invites/redemptions"
+]);
 
 export function createApp(deps: AppDeps) {
   const verifyAccess = requireAccess(deps.accessVerifier ?? denyAccess);
@@ -46,7 +49,8 @@ export function createApp(deps: AppDeps) {
   const memberOnly = requireMember(isMember);
   const memberUnlessExempt = createMiddleware(async (c, next) => {
     const pathname = new URL(c.req.url).pathname.replace(/\/+$/, "") || "/";
-    if (MEMBER_EXEMPT_PATHS.has(pathname)) return next();
+    const route = `${c.req.method.toUpperCase()} ${pathname}`;
+    if (MEMBER_EXEMPT_ROUTES.has(route)) return next();
     return memberOnly(c, next);
   });
   const app = new Hono({ strict: false })

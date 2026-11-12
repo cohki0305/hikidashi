@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { SkillDb } from "@/server/db";
-import { inviteLinks, members } from "@/server/db/schema";
+import { inviteLinks, members, oauthClients, oauthGrants } from "@/server/db/schema";
 import { hashToken } from "@/server/lib/oauth/token";
-import { ok, type Result, upstream } from "@/server/lib/result";
 import { InviteLinkRepository } from "@/server/repositories/invite-link-repository";
 import { MemberRepository } from "@/server/repositories/member-repository";
+import { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
 import { createTestDb, type TestDb } from "@/tests/helpers/test-db";
 import { MemberService } from "./index";
 
@@ -20,24 +20,19 @@ const INVALID_LINK = {
 } as const;
 const openDbs: TestDb[] = [];
 
-function setup(options: { ownerEmails?: string[]; revokeResult?: Result<void> } = {}): {
+function setup(options: { ownerEmails?: string[] } = {}): {
   db: SkillDb;
   service: MemberService;
-  revoked: string[];
   setClock: (date: Date) => void;
 } {
   const testDb = createTestDb();
   openDbs.push(testDb);
   let clock = NOW;
   let serial = 0;
-  const revoked: string[] = [];
   const service = new MemberService({
     members: new MemberRepository(testDb.db),
     inviteLinks: new InviteLinkRepository(testDb.db),
-    revokeGrantsFor: async (email) => {
-      revoked.push(email);
-      return options.revokeResult ?? ok(undefined);
-    },
+    grants: new OauthGrantRepository(testDb.db),
     ownerEmails: options.ownerEmails ?? [OWNER],
     now: () => clock,
     randomKey: () => `hkd_iv_test${String(++serial).padStart(3, "0")}`,
@@ -46,10 +41,46 @@ function setup(options: { ownerEmails?: string[]; revokeResult?: Result<void> } 
   return {
     db: testDb.db,
     service,
-    revoked,
     setClock: (date) => {
       clock = date;
     }
+  };
+}
+
+async function seedGrant(db: SkillDb, email: string, id = "grant-1") {
+  await db
+    .insert(oauthClients)
+    .values({
+      id: "client-1",
+      clientName: "架空の連携",
+      redirectUris: ["https://claude.ai/api/mcp/auth_callback"],
+      createdAt: NOW.toISOString()
+    })
+    .onConflictDoNothing()
+    .run();
+  await db
+    .insert(oauthGrants)
+    .values({
+      id,
+      email: email.toLowerCase(),
+      clientId: "client-1",
+      refreshTokenHash: "a".repeat(64),
+      refreshExpiresAt: new Date(NOW.getTime() + DAY_MS).toISOString(),
+      createdAt: NOW.toISOString()
+    })
+    .run();
+}
+
+async function grantRow(db: SkillDb, id = "grant-1") {
+  return await db.select().from(oauthGrants).where(eq(oauthGrants.id, id)).get();
+}
+
+function failBatch(db: SkillDb) {
+  const target = db as unknown as {
+    batch: (queries: readonly unknown[]) => Promise<readonly unknown[]>;
+  };
+  target.batch = async () => {
+    throw new Error("batch failed");
   };
 }
 
@@ -266,7 +297,7 @@ describe("MemberService.list", () => {
     await joinedMember(service, "taro@example.test");
     await service.remove(OWNER, "taro@example.test");
 
-    const listed = await service.list();
+    const listed = await service.list(OWNER);
 
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
@@ -276,10 +307,13 @@ describe("MemberService.list", () => {
     ]);
   });
 
-  test("空でもエラーにせず空の一覧を返す", async () => {
-    const { service } = setup({ ownerEmails: [] });
+  test("メンバーでない人は一覧を見られない", async () => {
+    const { service } = setup();
 
-    expect(await service.list()).toEqual({ ok: true, value: [] });
+    expect(await service.list("nobody@example.test")).toMatchObject({
+      ok: false,
+      kind: "forbidden"
+    });
   });
 });
 
@@ -369,28 +403,67 @@ describe("MemberService.remove", () => {
   });
 
   test("外すとメンバーでなくなり、大文字小文字を問わず grant を取り消す", async () => {
-    const { db, service, revoked } = setup();
+    const { db, service } = setup();
     await joinedMember(service, "hanako@example.test");
+    await seedGrant(db, "hanako@example.test");
 
     const removed = await service.remove(OWNER, "Hanako@Example.Test");
 
     expect(removed).toEqual({ ok: true, value: undefined });
     expect(await service.isMember("hanako@example.test")).toBe(false);
-    expect(revoked).toEqual(["hanako@example.test"]);
+    expect(await grantRow(db)).toMatchObject({
+      email: "hanako@example.test",
+      revokedAt: NOW.toISOString()
+    });
     expect(await memberRow(db, "hanako@example.test")).toMatchObject({
       removedAt: NOW.toISOString(),
       removedBy: OWNER
     });
   });
 
-  test("grant の取り消しに失敗したらその失敗を返す", async () => {
-    const { service } = setup({ revokeResult: upstream("取り消せませんでした") });
+  test("メンバーでない人は人を外せない", async () => {
+    const { service } = setup();
     await joinedMember(service, "hanako@example.test");
+
+    expect(await service.remove("nobody@example.test", "hanako@example.test")).toMatchObject({
+      ok: false,
+      kind: "forbidden"
+    });
+    expect(await service.isMember("hanako@example.test")).toBe(true);
+  });
+
+  test("外された人が自分で作ったリンクで戻れない", async () => {
+    const { db, service } = setup();
+    await joinedMember(service, "hanako@example.test");
+    const ownInvite = await createInvite(service, "hanako@example.test");
+
+    await service.remove(OWNER, "hanako@example.test");
+
+    const linkRow = await db
+      .select()
+      .from(inviteLinks)
+      .where(eq(inviteLinks.id, ownInvite.id))
+      .get();
+    expect(linkRow?.revokedAt).toBe(NOW.toISOString());
+    expect(await service.redeem("hanako@example.test", keyOf(ownInvite.url))).toEqual(INVALID_LINK);
+    expect(await service.isMember("hanako@example.test")).toBe(false);
+  });
+
+  test("まとめて外すのに失敗したら、メンバーも grant も元のまま", async () => {
+    const { db, service } = setup();
+    await joinedMember(service, "hanako@example.test");
+    await seedGrant(db, "hanako@example.test");
+    failBatch(db);
 
     expect(await service.remove(OWNER, "hanako@example.test")).toMatchObject({
       ok: false,
       kind: "upstream"
     });
+    expect(await memberRow(db, "hanako@example.test")).toMatchObject({
+      removedAt: null,
+      removedBy: null
+    });
+    expect(await grantRow(db)).toMatchObject({ revokedAt: null });
   });
 });
 

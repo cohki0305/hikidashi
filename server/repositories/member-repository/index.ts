@@ -6,6 +6,12 @@ import { ok, type Result, upstream } from "@/server/lib/result";
 /** members テーブルの 1 行。 */
 export type Member = typeof members.$inferSelect;
 
+/** batch にまとめる書き込み 1 文。 */
+export type MemberBatchStatement = { execute: () => Promise<unknown> };
+
+/** D1 の DB は batch を持つが、テストの bun:sqlite は持たない。 */
+type BatchCapableDb = { batch?: (queries: readonly unknown[]) => Promise<readonly unknown[]> };
+
 /** メールは小文字にそろえて保存・比較する。 */
 function normalizeEmail(email: string): string {
   return email.toLowerCase();
@@ -77,6 +83,19 @@ export class MemberRepository {
     }
   }
 
+  /** 外す文。まだ外していない行だけを対象にする。batch に混ぜるときに使う。 */
+  markRemovedStatement(input: {
+    email: string;
+    removedAt: string;
+    removedBy: string;
+  }): MemberBatchStatement {
+    return this.db
+      .update(members)
+      .set({ removedAt: input.removedAt, removedBy: normalizeEmail(input.removedBy) })
+      .where(and(eq(members.email, normalizeEmail(input.email)), isNull(members.removedAt)))
+      .returning({ email: members.email });
+  }
+
   /** 外す。まだ外していない行があったときだけ true。 */
   async markRemoved(input: {
     email: string;
@@ -91,6 +110,21 @@ export class MemberRepository {
         .returning({ email: members.email })
         .all();
       return ok(rows.length > 0);
+    } catch {
+      return upstream("メンバーを外せませんでした");
+    }
+  }
+
+  /** メンバーを外すときの書き込みを 1 回の batch で実行する。 */
+  async commit(statements: readonly MemberBatchStatement[]): Promise<Result<void>> {
+    try {
+      const batch = (this.db as BatchCapableDb).batch;
+      if (typeof batch === "function") {
+        await batch.call(this.db, statements);
+      } else {
+        for (const statement of statements) await statement.execute();
+      }
+      return ok(undefined);
     } catch {
       return upstream("メンバーを外せませんでした");
     }
