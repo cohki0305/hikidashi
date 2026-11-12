@@ -18,7 +18,7 @@ Worker の画面にある「Protect this Worker behind Access」は使いませ�
 3. アプリの名前を「hikidashi」にします。
 4. 宛先（destinations）に `hikidashi.<サブドメイン>.workers.dev` を、道を付けずに 1 つだけ入れます。
 5. ポリシーを「Allow」にし、使ってよい人のメールアドレスを一覧で並べます（グループでもかまいません）。
-6. 保存したら、アプリの概要に出る AUD を `wrangler.jsonc` の `ACCESS_AUD` に入れます。
+6. 保存したら、アプリの概要に出る AUD を `wrangler.production.jsonc` の `ACCESS_AUD` に入れます。
 
 画面（`/`・`/skills/*`・`/connect`・`/authorize`）、画面が使う API（`/api/*`）、
 Claude からのつなぐ頼みを受ける `/oauth/authorize` は、すべてこのアプリで守られます。

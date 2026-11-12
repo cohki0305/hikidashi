@@ -1,8 +1,7 @@
 {
+  // 手元の開発用の見本。本番の値は wrangler.production.jsonc（git に入れない）に書く。
   "name": "hikidashi",
   "main": "server/entry/worker.ts",
-  // cohki0305 のアカウント。ログイン中に複数のアカウントが見えても、ここに出す。
-  "account_id": "<アカウント ID>",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   // workers.dev の URL で公開する（独自ドメインは使わない）。プレビュー用の URL は作らない。

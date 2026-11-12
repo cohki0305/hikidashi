@@ -19,7 +19,7 @@ zip のダウンロードは R2 の署名付き URL に転送するため、S3 �
 
 1. Cloudflare のダッシュボードで R2 を開き、API トークンを作る（`hikidashi-skills` バケットの読み書き）。
 2. 発行時に出る Access Key ID と Secret Access Key を `.dev.vars` の `R2_ACCESS_KEY_ID`・`R2_SECRET_ACCESS_KEY` に入れる。
-3. `R2_ACCOUNT_ID`・`R2_BUCKET_NAME` は `wrangler.jsonc` の vars にある。アカウント ID は自分の値に差し替える。
+3. `R2_BUCKET_NAME` は `wrangler.jsonc` の vars にある。`R2_ACCOUNT_ID` は見本の値なので、`.dev.vars` に `R2_ACCOUNT_ID=<自分のアカウント ID>` を足して上書きする。
 
 キーの値はリポジトリに書かない。`.dev.vars` も共有しない。どれか欠けていると、ダウンロードは 503 になる。
 

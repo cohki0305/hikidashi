@@ -14,3 +14,4 @@ worker-configuration.d.ts
 .agent-pipeline.local.json
 .pipeline/
 *.tsbuildinfo
+wrangler.production.jsonc
