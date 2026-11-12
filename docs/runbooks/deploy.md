@@ -66,12 +66,13 @@ bunx wrangler secret put R2_SECRET_ACCESS_KEY
 
 `wrangler.production.jsonc` の `vars` に次の値を入れます。
 
-| 名前                 | 入れる値                                                               |
-| -------------------- | ---------------------------------------------------------------------- |
-| `APP_URL`            | `https://hikidashi.<サブドメイン>.workers.dev`（末尾の `/` なし）      |
-| `R2_ACCOUNT_ID`      | Cloudflare のアカウント ID（R2 の画面に出る）                          |
-| `ACCESS_TEAM_DOMAIN` | Access のチームの URL（例: `https://<チーム名>.cloudflareaccess.com`） |
-| `ACCESS_AUD`         | Access アプリの AUD（次の手順で作るアプリの値）                        |
+| 名前                 | 入れる値                                                                   |
+| -------------------- | -------------------------------------------------------------------------- |
+| `APP_URL`            | `https://hikidashi.<サブドメイン>.workers.dev`（末尾の `/` なし）          |
+| `R2_ACCOUNT_ID`      | Cloudflare のアカウント ID（R2 の画面に出る）                              |
+| `ACCESS_TEAM_DOMAIN` | Access のチームの URL（例: `https://<チーム名>.cloudflareaccess.com`）     |
+| `ACCESS_AUD`         | Access アプリの AUD（次の手順で作るアプリの値）                            |
+| `OWNER_EMAILS`       | 常にメンバーとみなす人のメールアドレス（カンマ区切り。空なら誰も入れない） |
 
 ## 6. Access のアプリを作る
 
@@ -110,5 +111,5 @@ curl -i <URL>/mcp
 
 ## 9. メンバーを出し入れする
 
-使える人を増やす・減らすときは、Access のアプリのポリシーだけを変えます。hikidashi 側に利用者の一覧はありません。
+使える人を増やす・減らすときは、hikidashi の画面「メンバー」で行います。Access のポリシーは変えません。
 詳しくは [access.md](./access.md) を見てください。

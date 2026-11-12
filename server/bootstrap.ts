@@ -2,6 +2,9 @@ import type { SkillDb } from "@/server/db";
 import { type AccessVerifier, createAccessVerifier } from "@/server/lib/access/verify-access-jwt";
 import { issuerOf } from "@/server/lib/oauth/issuer";
 import { type R2S3Config, r2S3ConfigFrom } from "@/server/lib/r2/presign";
+import { ok } from "@/server/lib/result";
+import { InviteLinkRepository } from "@/server/repositories/invite-link-repository";
+import { MemberRepository } from "@/server/repositories/member-repository";
 import { OauthAccessTokenRepository } from "@/server/repositories/oauth-access-token-repository";
 import { OauthClientRepository } from "@/server/repositories/oauth-client-repository";
 import { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
@@ -12,6 +15,7 @@ import { createSkillDb, SkillRepository } from "@/server/repositories/skill-repo
 import { SkillVersionRepository } from "@/server/repositories/skill-version-repository";
 import { UploadRepository } from "@/server/repositories/upload-repository";
 import { McpService } from "@/server/services/mcp-service";
+import { MemberService } from "@/server/services/member-service";
 import { OauthService } from "@/server/services/oauth-service";
 import { PublishService } from "@/server/services/publish-service";
 import { SkillService } from "@/server/services/skill-service";
@@ -29,6 +33,8 @@ export type BootstrapEnv = {
   CLAUDE_AI_MAX_BYTES?: string;
   /** hikidashi 自身の URL。OAuth と MCP が名乗る issuer になる。 */
   APP_URL?: string;
+  /** 常にメンバーとみなす人。カンマ区切り。ここに居る人は外せない。 */
+  OWNER_EMAILS?: string;
   R2_ACCOUNT_ID?: string;
   R2_BUCKET_NAME?: string;
   R2_ACCESS_KEY_ID?: string;
@@ -112,14 +118,40 @@ export function oauthServiceFromEnv(env: BootstrapEnv): OauthService | undefined
   return oauthServiceFromDb(createSkillDb(env.DB), appUrl);
 }
 
+/** OWNER_EMAILS を、小文字にそろえた重複なしの一覧にする。空なら誰も入れない。 */
+export function ownerEmailsFromEnv(env: BootstrapEnv): string[] {
+  const emails = (env.OWNER_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => email.length > 0);
+  return [...new Set(emails)];
+}
+
+/** DB の束縛からメンバーの service を組み立てる。DB が無ければ undefined。 */
+export function memberServiceFromEnv(
+  env: BootstrapEnv,
+  oauth?: Pick<OauthService, "revokeAllFor">
+): MemberService | undefined {
+  if (!env.DB) return undefined;
+  const db = createSkillDb(env.DB);
+  return new MemberService({
+    members: new MemberRepository(db),
+    inviteLinks: new InviteLinkRepository(db),
+    revokeGrantsFor: async (email) => (oauth ? oauth.revokeAllFor(email) : ok(undefined)),
+    ownerEmails: ownerEmailsFromEnv(env),
+    appUrl: appUrlFromEnv(env)
+  });
+}
+
 /** スキルと OAuth が揃ったときだけ、MCP の service を組み立てる。 */
 export function mcpServiceFromEnv(
   oauth: OauthService | undefined,
   skills: SkillService | undefined,
-  publish: PublishService | undefined
+  publish: PublishService | undefined,
+  isMember: (email: string) => Promise<boolean>
 ): McpService | undefined {
   if (!oauth || !skills) return undefined;
-  return new McpService({ oauth, skills, install: skills, publish });
+  return new McpService({ oauth, skills, install: skills, publish, isMember });
 }
 
 /** 依存を組み立てて Hono アプリを返す。束縛はリクエストごとに渡る。 */
@@ -134,12 +166,18 @@ export function bootstrap(
   const skillService = skillServiceFromEnv(env);
   const oauthService = oauthServiceFromEnv(env);
   const publishService = publishServiceFromEnv(env);
+  const memberService = memberServiceFromEnv(env, oauthService);
+  const isMember = memberService
+    ? (email: string) => memberService.isMember(email)
+    : async () => false;
   return createApp({
     logError,
     skillService,
     accessVerifier: accessVerifierFromEnv(env),
     oauth: oauthService,
-    mcp: mcpServiceFromEnv(oauthService, skillService, publishService),
+    mcp: mcpServiceFromEnv(oauthService, skillService, publishService, isMember),
+    isMember,
+    memberService,
     appUrl: appUrlFromEnv(env)
   });
 }

@@ -29,7 +29,13 @@ export type OAuthServiceDeps = {
   >;
   grants: Pick<
     OauthGrantRepository,
-    "create" | "findById" | "findByRefreshHash" | "rotateRefresh" | "revoke" | "touch"
+    | "create"
+    | "findById"
+    | "findByRefreshHash"
+    | "rotateRefresh"
+    | "revoke"
+    | "revokeByEmail"
+    | "touch"
   >;
   accessTokens: Pick<OauthAccessTokenRepository, "create" | "findLive">;
   usedRefreshTokens: Pick<OauthUsedRefreshTokenRepository, "findGrantId">;
@@ -266,6 +272,11 @@ export class OauthService {
     if (!saved.ok) return saved;
 
     return ok({ accessToken, refreshToken, expiresIn: ACCESS_TTL_SECONDS });
+  }
+
+  /** その人のつながりをすべて取り消す。外した人を Claude から使えなくする。 */
+  async revokeAllFor(email: string): Promise<Result<void>> {
+    return this.deps.grants.revokeByEmail(email.toLowerCase(), this.now().toISOString());
   }
 
   async authenticate(accessToken: string): Promise<{ email: string } | null> {

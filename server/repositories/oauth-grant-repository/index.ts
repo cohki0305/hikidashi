@@ -7,6 +7,9 @@ import { ok, type Result, upstream } from "@/server/lib/result";
 /** oauth_grants テーブルの 1 行。 */
 export type OauthGrantRow = typeof oauthGrants.$inferSelect;
 
+/** メールは小文字にそろえて保存・比較する。 */
+const normalizeEmail = (email: string) => email.toLowerCase();
+
 /** 最後に使った日時を書き換える間隔。 */
 const TOUCH_INTERVAL_MS = 5 * 60_000;
 
@@ -109,6 +112,20 @@ export class OauthGrantRepository {
         .update(oauthGrants)
         .set({ revokedAt: now })
         .where(and(eq(oauthGrants.id, grantId), isNull(oauthGrants.revokedAt)))
+        .run();
+      return ok(undefined);
+    } catch {
+      return upstream("つながりを取り消せませんでした");
+    }
+  }
+
+  /** その人のつながりをすべて取り消す。取り消し済みは変えない。 */
+  async revokeByEmail(email: string, now: string): Promise<Result<void>> {
+    try {
+      await this.db
+        .update(oauthGrants)
+        .set({ revokedAt: now })
+        .where(and(eq(oauthGrants.email, normalizeEmail(email)), isNull(oauthGrants.revokedAt)))
         .run();
       return ok(undefined);
     } catch {

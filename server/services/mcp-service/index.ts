@@ -23,6 +23,8 @@ export type McpServiceDeps = {
   install?: InstallPort;
   /** スキルを公開するための口。 */
   publish?: PublishPort;
+  /** そのメールアドレスが今もメンバーかを確かめる。外れた人のトークンは通さない。 */
+  isMember: (email: string) => Promise<boolean>;
   /** 載せるツール。省略すると MCP_TOOLS を全部載せる。 */
   tools?: readonly McpTool<unknown>[];
 };
@@ -43,7 +45,9 @@ export class McpService {
   /** トークンを確かめ、呼び出した人を返す。無効なら null（入口が 401 にする）。 */
   async authenticate(accessToken: string): Promise<McpCallContext | null> {
     const auth = await this.deps.oauth.authenticate(accessToken);
-    return auth === null ? null : { email: auth.email };
+    if (auth === null) return null;
+    if (!(await this.deps.isMember(auth.email))) return null;
+    return { email: auth.email };
   }
 
   /** JSON-RPC の一覧と実行を、呼び出した人に結びつけて返す。 */

@@ -11,6 +11,8 @@ export type OAuthDependencies = {
   appUrl?: string;
   /** `/oauth/authorize` で本人確認する Middleware（requireAccess）。 */
   verifyAccess?: MiddlewareHandler<{ Bindings: AccessEnv }>;
+  /** `/oauth/authorize` でメンバーかどうかを確かめる Middleware（requireMember）。 */
+  verifyMember?: MiddlewareHandler;
 };
 
 function completePort(oauth?: Partial<OAuthServicePort>): OAuthServicePort | null {
@@ -23,9 +25,14 @@ function completePort(oauth?: Partial<OAuthServicePort>): OAuthServicePort | nul
  * 認証なしで開く OAuth の入口。APP_URL か Service が欠けた構成では何も載せず、
  * 404 にする（fail closed）。`/oauth/authorize` だけは Access の JWT を通す。
  */
-export function createOAuthRoutes({ oauth, appUrl, verifyAccess }: OAuthDependencies) {
+export function createOAuthRoutes({
+  oauth,
+  appUrl,
+  verifyAccess,
+  verifyMember
+}: OAuthDependencies) {
   const port = completePort(oauth);
-  if (!port || !appUrl || !verifyAccess) return factory.createApp();
+  if (!port || !appUrl || !verifyAccess || !verifyMember) return factory.createApp();
   const origin = appUrl.replace(/\/+$/, "");
   return factory
     .createApp()
@@ -35,6 +42,7 @@ export function createOAuthRoutes({ oauth, appUrl, verifyAccess }: OAuthDependen
       await next();
     })
     .use("/oauth/authorize", verifyAccess)
+    .use("/oauth/authorize", verifyMember)
     .route("/", oauthRoutes);
 }
 

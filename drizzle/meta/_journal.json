@@ -15,6 +15,13 @@
       "when": 1794432083507,
       "tag": "0001_flat_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794442001766,
+      "tag": "0002_mighty_frog_thor",
+      "breakpoints": true
     }
   ]
 }

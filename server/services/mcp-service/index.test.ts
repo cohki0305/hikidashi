@@ -36,6 +36,7 @@ function build(
     list?: SkillCatalog["list"];
     show?: SkillCatalog["show"];
     latestByNames?: SkillCatalog["latestByNames"];
+    isMember?: (email: string) => Promise<boolean>;
   } = {}
 ) {
   const skills: SkillCatalog = {
@@ -52,7 +53,10 @@ function build(
       return token === "hkd_at_live" ? { email: "member@example.test" } : null;
     }
   };
-  return { service: new McpService({ oauth, skills }), calls };
+  return {
+    service: new McpService({ oauth, skills, isMember: over.isMember ?? (async () => true) }),
+    calls
+  };
 }
 
 const context = { email: "member@example.test" };
@@ -62,6 +66,21 @@ describe("McpService", () => {
     const { service } = build();
     expect(await service.authenticate("hkd_at_live")).toEqual({ email: "member@example.test" });
     expect(await service.authenticate("hkd_at_dead")).toBeNull();
+  });
+
+  test("メンバーでないメールの grant は通さない", async () => {
+    const { service } = build({ isMember: async () => false });
+
+    expect(await service.authenticate("hkd_at_live")).toBeNull();
+  });
+
+  test("外した後の呼び出しは null になる", async () => {
+    let member = true;
+    const { service } = build({ isMember: async () => member });
+
+    expect(await service.authenticate("hkd_at_live")).toEqual({ email: "member@example.test" });
+    member = false;
+    expect(await service.authenticate("hkd_at_live")).toBeNull();
   });
 
   test("tools/list は入力の形つきで 5 つ返す", () => {
