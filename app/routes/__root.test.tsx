@@ -86,8 +86,7 @@ describe("ルートの枠", () => {
     window.history.replaceState(null, "", "/join?key=x");
     setMe(false);
     renderRoot();
-    await new Promise((r) => setTimeout(r, 20));
-    expect(screen.getByText("画面の中身")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("画面の中身")).toBeTruthy());
     expect(screen.queryByText(NOTICE)).toBeNull();
   });
 
