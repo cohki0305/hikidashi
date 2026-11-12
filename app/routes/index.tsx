@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { SkillCard } from "@/app/components/skills/skill-card";
+import { SkillListHeader, SkillRow } from "@/app/components/skills/skill-row";
 import { SkillSearch } from "@/app/components/skills/skill-search";
 import { PageShell } from "@/app/components/ui/page-shell";
 import { useMe } from "@/app/hooks/use-me";
@@ -52,17 +52,14 @@ export function IndexPage() {
         <p style={{ ...mutedStyle, fontSize: 15 }}>見つかるスキルはありません。</p>
       ) : null}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-          gap: 16
-        }}
-      >
-        {shown.map((skill) => (
-          <SkillCard key={skill.name} skill={skill} />
-        ))}
-      </div>
+      {shown.length > 0 ? (
+        <div className="skill-list">
+          <SkillListHeader />
+          {shown.map((skill) => (
+            <SkillRow key={skill.name} skill={skill} />
+          ))}
+        </div>
+      ) : null}
     </PageShell>
   );
 }
