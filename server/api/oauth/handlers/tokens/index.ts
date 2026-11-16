@@ -13,6 +13,7 @@ const FIELDS = [
   "code_verifier",
   "client_id",
   "redirect_uri",
+  "resource",
   "refresh_token"
 ] as const;
 
@@ -35,7 +36,10 @@ function tokenResponse(c: Context, tokens: TokenSet) {
 
 /** コード・refresh をトークンに替える（RFC 6749 の形で返す）。 */
 export const create = factory.createHandlers(async (c) => {
-  const form = stringFields(await c.req.parseBody().catch(() => ({})), FIELDS);
+  const body = await c.req.parseBody({ all: true }).catch((): Record<string, unknown> => ({}));
+  if (body.resource !== undefined && typeof body.resource !== "string")
+    return oauthError(c, 400, "invalid_target");
+  const form = stringFields(body, FIELDS);
   const oauth = c.get("oauth");
 
   if (form.grant_type === "authorization_code") {
@@ -44,6 +48,7 @@ export const create = factory.createHandlers(async (c) => {
     const result = await oauth.exchangeCode({
       code: form.code,
       codeVerifier: form.code_verifier,
+      resource: form.resource,
       clientId: form.client_id,
       redirectUri: form.redirect_uri
     });
@@ -54,6 +59,7 @@ export const create = factory.createHandlers(async (c) => {
     if (!form.refresh_token || !form.client_id) return oauthError(c, 400, "invalid_request");
     const result = await oauth.refresh({
       refreshToken: form.refresh_token,
+      resource: form.resource,
       clientId: form.client_id
     });
     return result.ok ? tokenResponse(c, result.value) : tokenFailure(c, result);

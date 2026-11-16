@@ -1,7 +1,7 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import type { SkillDb } from "@/server/db";
 import { uploads } from "@/server/db/schema";
-import { ok, type Result, upstream } from "@/server/lib/result";
+import { ok, type Result, rateLimited, upstream } from "@/server/lib/result";
 
 /** 1 回の batch にまとめる書き込み 1 文。各リポジトリが自分のテーブルの文を組み立てる。 */
 export type BatchStatement = { execute: () => Promise<unknown> };
@@ -63,8 +63,16 @@ export class UploadRepository {
   /** pending の受け皿を作る。 */
   async insertPending(input: NewUpload): Promise<Result<void>> {
     try {
-      await this.insertPendingStatement(input).execute();
-      return ok(undefined);
+      // 件数確認と発行を 1 文にまとめ、並行する要求にも同じ上限を適用する。
+      const result = await this.db.run(sql`
+        INSERT INTO uploads (id, r2_key, created_by, expires_at, created_at, status)
+        SELECT ${input.id}, ${input.r2Key}, ${input.createdBy}, ${input.expiresAt}, ${input.createdAt}, 'pending'
+        WHERE (SELECT count(*) FROM uploads WHERE created_by = ${input.createdBy}
+          AND expires_at > ${input.createdAt}) < 10
+      `);
+      return changesOf(result) > 0
+        ? ok(undefined)
+        : rateLimited("30 分間に作れるアップロード先は 10 個までです");
     } catch {
       return upstream("受け皿を作れませんでした");
     }

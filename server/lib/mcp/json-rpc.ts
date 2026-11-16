@@ -32,7 +32,7 @@ export type InstallPort = {
 
 /** スキルを公開するための口。 */
 export type PublishPort = {
-  begin(email: string): Promise<Result<PublishTicket>>;
+  begin(email: string, sizeBytes: number): Promise<Result<PublishTicket>>;
   finish(email: string, uploadId: string, note?: string): Promise<Result<FinishPublishResult>>;
 };
 

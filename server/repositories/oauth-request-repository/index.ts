@@ -92,13 +92,32 @@ export class OauthRequestRepository {
     }
   }
 
+  async findByCodeHash(codeHash: string): Promise<Result<OauthRequestRow | null>> {
+    try {
+      const row = await this.db
+        .select()
+        .from(oauthRequests)
+        .where(eq(oauthRequests.codeHash, codeHash))
+        .get();
+      return ok(row ?? null);
+    } catch {
+      return upstream("コードを確認できませんでした");
+    }
+  }
+
   /** コードを使い済みにして頼みを返す。同じコードで 1 回だけ成功する。 */
   async consumeCode(codeHash: string, now: string): Promise<Result<OauthRequestRow | null>> {
     try {
       const row = await this.db
         .update(oauthRequests)
         .set({ usedAt: now })
-        .where(and(eq(oauthRequests.codeHash, codeHash), isNull(oauthRequests.usedAt)))
+        .where(
+          and(
+            eq(oauthRequests.codeHash, codeHash),
+            isNull(oauthRequests.usedAt),
+            gt(oauthRequests.expiresAt, now)
+          )
+        )
         .returning()
         .get();
       return ok(row ?? null);

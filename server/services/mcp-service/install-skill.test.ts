@@ -13,6 +13,7 @@ const info: InstallInfo = {
   fingerprint: "fp-3",
   sizeBytes: 120,
   claudeCodeOnly: false,
+  hasSetup: false,
   downloadUrl: "https://r2.example.test/download?signature=abc",
   expiresInSeconds: 600
 };
@@ -84,6 +85,21 @@ describe("install_skill", () => {
     const steps = (result.value as { steps: string }).steps;
     expect(steps).not.toContain("claude.ai");
     expect(steps).toContain("このスキルは大きいので Claude Code でだけ使えます。");
+  });
+
+  test("setup.sh があるスキルはセットアップの手順を足す", async () => {
+    const result = await installSkillTool.call(
+      context(async () => ok({ ...info, hasSetup: true })),
+      { name: "invoice-entry" }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("失敗しました");
+    const value = result.value as Record<string, unknown>;
+    expect(value.hasSetup).toBe(true);
+    const steps = value.steps as string;
+    expect(steps).toContain("setup.sh");
+    expect(steps).toContain("bash setup.sh");
   });
 
   test("無い名前・無い版は「見つかりません」をそのまま返す", async () => {

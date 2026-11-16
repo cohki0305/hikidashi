@@ -26,6 +26,7 @@ export class OauthGrantRepository {
   /** 新しいつながりを保存する。id を渡さなければ作る。 */
   async create(input: {
     id?: string;
+    resource?: string;
     email: string;
     clientId: string;
     refreshTokenHash: string;

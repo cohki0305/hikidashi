@@ -70,6 +70,7 @@ function fakeService(options: { missingConfig?: boolean; invalidInput?: boolean 
         fingerprint: "abc123",
         sizeBytes: 2048,
         claudeCodeOnly: false,
+        hasSetup: false,
         downloadUrl:
           "https://signed.example/team-skill-v2.zip?X-Amz-Expires=600&X-Amz-Signature=abc",
         expiresInSeconds: 600

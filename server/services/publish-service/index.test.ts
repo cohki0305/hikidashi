@@ -102,7 +102,7 @@ async function uploadZip(
   email: string,
   zip: Uint8Array
 ) {
-  const begun = await service.begin(email);
+  const begun = await service.begin(email, zip.length);
   if (!begun.ok) throw new Error(begun.message);
   fake.objects.set(`uploads/${begun.value.uploadId}.zip`, zip);
   return begun.value.uploadId;
@@ -132,7 +132,7 @@ describe("PublishService.begin", () => {
   test("pending の受け皿を作り、30 分有効の署名付き URL を返す", async () => {
     const { testDb, service } = setup();
 
-    const result = await service.begin("dev@example.com");
+    const result = await service.begin("dev@example.com", 100);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -153,10 +153,21 @@ describe("PublishService.begin", () => {
     });
   });
 
+  test("発行数はメンバーごとに制限し、過大なサイズには発行しない", async () => {
+    const { service } = setup();
+    expect(await service.begin("dev@example.com", 209715201)).toMatchObject({ kind: "invalid" });
+    const results = await Promise.all(
+      Array.from({ length: 11 }, () => service.begin("dev@example.com", 20))
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(10);
+    expect(results.find((r) => !r.ok)).toMatchObject({ kind: "rate_limited" });
+    expect((await service.begin("other@example.com", 20)).ok).toBe(true);
+  });
+
   test("S3 の設定が無ければ受け皿を作らずエラーを返す", async () => {
     const { testDb, service } = setup({ s3: null });
 
-    const result = await service.begin("dev@example.com");
+    const result = await service.begin("dev@example.com", 100);
 
     expect(result).toMatchObject({ ok: false, kind: "invalid" });
     expect(testDb.db.select().from(uploads).all()).toEqual([]);
@@ -204,7 +215,7 @@ describe("PublishService.finish", () => {
       sizeBytes: zip.length
     });
     const versionKey = versions[0]?.r2Key ?? "";
-    expect(versionKey).toStartWith(`versions/${skill.id}/1-`);
+    expect(versionKey).toStartWith("versions/");
     expect(versionKey).toEndWith(".zip");
     expect((await fileRows(testDb.db, versions[0]?.id ?? "")).map((file) => file.path)).toEqual([
       "SKILL.md",
@@ -215,6 +226,24 @@ describe("PublishService.finish", () => {
     expect(fake.objects.has(versionKey)).toBe(true);
     expect(fake.objects.has(`uploads/${uploadId}.zip`)).toBe(false);
     expect((await uploadRow(testDb.db, uploadId))?.status).toBe("used");
+  });
+
+  test("コピー後に一時ファイルが変わっても配布物と検査結果は一致する", async () => {
+    const { fake, service } = setup();
+    const zip = skillZip("alpha");
+    const id = await uploadZip(fake, service, "dev@example.com", zip);
+    let changed = false;
+    const head = fake.bucket.head.bind(fake.bucket);
+    fake.bucket.head = async (key) => {
+      if (key.startsWith("versions/")) {
+        changed = true;
+        fake.objects.set(`uploads/${id}.zip`, skillZip("beta"));
+      }
+      return head(key);
+    };
+    expect(await service.finish("dev@example.com", id)).toMatchObject({ value: { name: "alpha" } });
+    expect(changed).toBe(true);
+    expect([...fake.objects.values()]).toEqual([zip]);
   });
 
   test("同じ中身を圧縮率と順番を変えて公開しても unchanged で版が増えない", async () => {
@@ -240,7 +269,8 @@ describe("PublishService.finish", () => {
     if (!second.ok) return;
     expect(second.value).toEqual({ status: "unchanged", name: "alpha", version: 1 });
     expect(await versionRows(testDb.db, skillId)).toHaveLength(1);
-    expect(calls).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(fake.objects.has(calls[0]?.toKey ?? "")).toBe(false);
     expect((await uploadRow(testDb.db, secondId))?.status).toBe("used");
     expect(fake.objects.has(`uploads/${secondId}.zip`)).toBe(false);
   });
@@ -270,7 +300,7 @@ describe("PublishService.finish", () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.fromKey).toBe(`uploads/${secondId}.zip`);
-    expect(calls[0]?.toKey).toStartWith(`versions/${skillId}/2-`);
+    expect(calls[0]?.toKey).toStartWith("versions/");
   });
 
   test("受け皿が無い・他人のもの・使用済み・期限切れはそれぞれ分かる文言で断る", async () => {
@@ -282,7 +312,7 @@ describe("PublishService.finish", () => {
       message: "この受け皿は見つかりません"
     });
 
-    const begun = await service.begin("other@example.com");
+    const begun = await service.begin("other@example.com", 100);
     if (!begun.ok) throw new Error(begun.message);
     expect(await service.finish("dev@example.com", begun.value.uploadId)).toMatchObject({
       ok: false,
@@ -313,7 +343,7 @@ describe("PublishService.finish", () => {
 
   test("R2 に zip が届いていなければ断る", async () => {
     const { testDb, service } = setup();
-    const begun = await service.begin("dev@example.com");
+    const begun = await service.begin("dev@example.com", 100);
     if (!begun.ok) throw new Error(begun.message);
 
     expect(await service.finish("dev@example.com", begun.value.uploadId)).toMatchObject({
@@ -326,7 +356,7 @@ describe("PublishService.finish", () => {
 
   test("上限を超える zip は検査せずに断る", async () => {
     const { testDb, fake, service } = setup();
-    const begun = await service.begin("dev@example.com");
+    const begun = await service.begin("dev@example.com", 100);
     if (!begun.ok) throw new Error(begun.message);
     const bucket = {
       ...fake.bucket,
@@ -423,6 +453,17 @@ describe("PublishService.finish", () => {
     expect(fake.objects.has(copied)).toBe(false);
     expect(fake.objects.has(`uploads/${uploadId}.zip`)).toBe(true);
     expect((await uploadRow(testDb.db, uploadId))?.status).toBe("pending");
+  });
+
+  test("発行数はメンバーごとに制限し、過大なサイズには発行しない", async () => {
+    const { service } = setup();
+    expect(await service.begin("dev@example.com", 209715201)).toMatchObject({ kind: "invalid" });
+    const results = await Promise.all(
+      Array.from({ length: 11 }, () => service.begin("dev@example.com", 20))
+    );
+    expect(results.filter((r) => r.ok)).toHaveLength(10);
+    expect(results.find((r) => !r.ok)).toMatchObject({ kind: "rate_limited" });
+    expect((await service.begin("other@example.com", 20)).ok).toBe(true);
   });
 
   test("S3 の設定が無ければ公開しない", async () => {

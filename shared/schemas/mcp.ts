@@ -28,8 +28,11 @@ export const installSkillInputSchema = z.object({
 });
 export type InstallSkillInput = z.infer<typeof installSkillInputSchema>;
 
-/** MCP の begin_publish が受け取る入力（無し）。 */
-export const beginPublishInputSchema = z.object({});
+/** MCP の begin_publish が受け取る入力（完成した zip のバイト数）。 */
+export const MAX_UPLOAD_BYTES = 209_715_200;
+export const beginPublishInputSchema = z.object({
+  sizeBytes: z.number().int().min(1).max(MAX_UPLOAD_BYTES)
+});
 export type BeginPublishInput = z.infer<typeof beginPublishInputSchema>;
 
 /** MCP の finish_publish が受け取る、受け皿と公開のメモ。 */
@@ -46,6 +49,7 @@ export const installInfoSchema = z.object({
   fingerprint: z.string().min(1),
   sizeBytes: z.number().int().nonnegative(),
   claudeCodeOnly: z.boolean(),
+  hasSetup: z.boolean(),
   downloadUrl: z.string().min(1),
   expiresInSeconds: z.number().int().positive()
 });

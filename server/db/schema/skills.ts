@@ -71,6 +71,7 @@ export const uploads = sqliteTable(
     createdAt: text("created_at").notNull()
   },
   (table) => [
+    index("uploads_creator_expires_at_idx").on(table.createdBy, table.expiresAt),
     index("uploads_status_expires_at_idx").on(table.status, table.expiresAt),
     check("uploads_status_check", sql`${table.status} in ('pending', 'used', 'expired')`)
   ]

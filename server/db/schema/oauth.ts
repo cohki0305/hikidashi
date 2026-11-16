@@ -46,6 +46,7 @@ export const oauthGrants = sqliteTable(
     clientId: text("client_id")
       .notNull()
       .references(() => oauthClients.id, { onDelete: "cascade" }),
+    resource: text("resource"),
     refreshTokenHash: text("refresh_token_hash").notNull().unique(),
     refreshExpiresAt: text("refresh_expires_at").notNull(),
     createdAt: text("created_at").notNull(),

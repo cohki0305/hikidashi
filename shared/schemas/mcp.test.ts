@@ -61,8 +61,8 @@ describe("MCP ツールの入力", () => {
     );
   });
 
-  test("begin_publish は入力を取らない", () => {
-    expect(beginPublishInputSchema.safeParse({}).success).toBe(true);
+  test("begin_publish は zip のサイズを必須にする", () => {
+    expect(beginPublishInputSchema.safeParse({}).success).toBe(false);
   });
 
   test("finish_publish は受け皿を必須にし、note は 500 字まで受ける", () => {
@@ -84,6 +84,7 @@ describe("MCP ツールの結果", () => {
     fingerprint: "fp-3",
     sizeBytes: 120,
     claudeCodeOnly: false,
+    hasSetup: false,
     downloadUrl: "https://r2.example.test/download?signature=abc",
     expiresInSeconds: 600
   };

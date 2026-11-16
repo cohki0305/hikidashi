@@ -39,6 +39,7 @@ bun run db:migrate:prod
 
 ```sh
 bunx wrangler r2 bucket create hikidashi-skills
+bunx wrangler r2 bucket lifecycle add hikidashi-skills expire-uploads uploads/ --expire-days 1
 ```
 
 バケットの名前は `wrangler.production.jsonc` の `R2_BUCKET_NAME` と合わせます。
@@ -113,3 +114,5 @@ curl -i <URL>/mcp
 
 使える人を増やす・減らすときは、hikidashi の画面「メンバー」で行います。Access のポリシーは変えません。
 詳しくは [access.md](./access.md) を見てください。
+
+既存環境を更新するときも、上記の R2 削除ルールを追加し、D1 マイグレーションを Worker より先に適用する。利用先が記録されていない旧 OAuth 接続は、更新後に Claude から接続し直す。

@@ -1,15 +1,15 @@
-import type { SkillDb } from "@/server/db";
 import { isCodeChallenge, verifyS256 } from "@/server/lib/oauth/pkce";
 import { redirectWith } from "@/server/lib/oauth/redirect-uri";
 import { generateToken, hashToken } from "@/server/lib/oauth/token";
 import { conflict, invalid, notFound, ok, type Result } from "@/server/lib/result";
-import type { OauthAccessTokenRepository } from "@/server/repositories/oauth-access-token-repository";
-import type { OauthClientRepository } from "@/server/repositories/oauth-client-repository";
-import type { OauthGrantRepository } from "@/server/repositories/oauth-grant-repository";
-import type { OauthRequestRepository } from "@/server/repositories/oauth-request-repository";
-import type { OauthUsedRefreshTokenRepository } from "@/server/repositories/oauth-used-refresh-token-repository";
 import { type ClientRegistrationInput, type RegisteredClient, registerClient } from "./register";
-import type { AuthorizationStart, AuthorizeParams, RequestDescription, TokenSet } from "./types";
+import type {
+  AuthorizationStart,
+  AuthorizeParams,
+  OAuthServiceDeps,
+  RequestDescription,
+  TokenSet
+} from "./types";
 
 const MINUTE_MS = 60_000;
 const REQUEST_TTL_MS = 10 * MINUTE_MS;
@@ -19,30 +19,6 @@ const REFRESH_TTL_MS = 30 * 24 * 60 * MINUTE_MS;
 const EXPIRED_MESSAGE = "この画面は期限が切れました。Claude の画面からもう一度つないでください。";
 const ALREADY_HANDLED_MESSAGE = "すでに処理されています";
 const REQUEST_NOT_FOUND_MESSAGE = "つなぐ頼みが見つかりません";
-
-export type OAuthServiceDeps = {
-  db: SkillDb;
-  clients: Pick<OauthClientRepository, "create" | "findById">;
-  requests: Pick<
-    OauthRequestRepository,
-    "create" | "findById" | "approve" | "markDenied" | "consumeCode"
-  >;
-  grants: Pick<
-    OauthGrantRepository,
-    | "create"
-    | "findById"
-    | "findByRefreshHash"
-    | "rotateRefresh"
-    | "revoke"
-    | "revokeByEmail"
-    | "touch"
-  >;
-  accessTokens: Pick<OauthAccessTokenRepository, "create" | "findLive">;
-  usedRefreshTokens: Pick<OauthUsedRefreshTokenRepository, "findGrantId">;
-  /** 認可サーバーの案内の issuer と同じ値。戻り先に iss として付ける（RFC 9207） */
-  issuer: string;
-  now?: () => Date;
-};
 
 /** RFC 6749 のエラーは message にコード（`invalid_grant` など）を入れて返す。 */
 const grantError = () => invalid("invalid_grant");
@@ -78,6 +54,12 @@ export class OauthService {
     if (!registered || !redirectUri || !registered.redirectUris.includes(redirectUri))
       return ok({ kind: "unusable" });
 
+    const resource = `${this.deps.issuer}/mcp`;
+    if (params.resource !== undefined && params.resource !== resource)
+      return ok({
+        kind: "rejected",
+        redirectTo: this.back(redirectUri, { error: "invalid_target", state: params.state ?? null })
+      });
     const challenge = params.codeChallenge;
     if (
       params.responseType !== "code" ||
@@ -98,7 +80,7 @@ export class OauthService {
       redirectUri,
       state: params.state ?? null,
       codeChallenge: challenge,
-      resource: params.resource ?? null,
+      resource,
       expiresAt: new Date(this.now().getTime() + REQUEST_TTL_MS).toISOString()
     });
     if (!request.ok) return request;
@@ -187,18 +169,24 @@ export class OauthService {
    */
   async exchangeCode(input: {
     code: string;
+    resource?: string;
     codeVerifier: string;
     clientId: string;
     redirectUri: string;
   }): Promise<Result<TokenSet>> {
     const now = this.now();
     const codeHash = await hashToken(input.code);
-    const consumed = await this.deps.requests.consumeCode(codeHash, now.toISOString());
-    if (!consumed.ok) return consumed;
-    const request = consumed.value;
+    const resource = `${this.deps.issuer}/mcp`;
+    if (input.resource !== undefined && input.resource !== resource)
+      return invalid("invalid_target");
+    const found = await this.deps.requests.findByCodeHash(codeHash);
+    if (!found.ok) return found;
+    const request = found.value;
     if (!request) return grantError();
     if (
       !request.email ||
+      request.usedAt !== null ||
+      (request.resource !== null && request.resource !== resource) ||
       request.expiresAt <= now.toISOString() ||
       request.clientId !== input.clientId ||
       request.redirectUri !== input.redirectUri ||
@@ -206,8 +194,12 @@ export class OauthService {
     )
       return grantError();
 
+    const consumed = await this.deps.requests.consumeCode(codeHash, this.now().toISOString());
+    if (!consumed.ok) return consumed;
+    if (!consumed.value) return grantError();
     const refreshToken = generateToken("refresh");
     const grant = await this.deps.grants.create({
+      resource,
       email: request.email,
       clientId: request.clientId,
       refreshTokenHash: await hashToken(refreshToken),
@@ -229,8 +221,14 @@ export class OauthService {
   }
 
   /** refresh を回転させる。使い終わった値がもう一度来たら grant ごと取り消す。 */
-  async refresh(input: { refreshToken: string; clientId: string }): Promise<Result<TokenSet>> {
+  async refresh(input: {
+    refreshToken: string;
+    clientId: string;
+    resource?: string;
+  }): Promise<Result<TokenSet>> {
     const now = this.now();
+    if (input.resource !== undefined && input.resource !== `${this.deps.issuer}/mcp`)
+      return invalid("invalid_target");
     const hash = await hashToken(input.refreshToken);
     const grant = await this.deps.grants.findByRefreshHash(hash);
     if (!grant.ok) return grant;
@@ -240,6 +238,7 @@ export class OauthService {
       if (reused.value) await this.deps.grants.revoke(reused.value, now.toISOString());
       return grantError();
     }
+    if (grant.value.resource !== `${this.deps.issuer}/mcp`) return grantError();
     if (grant.value.revokedAt !== null) return grantError();
     if (grant.value.refreshExpiresAt <= now.toISOString()) return grantError();
     if (grant.value.clientId !== input.clientId) return grantError();
@@ -283,7 +282,8 @@ export class OauthService {
     const now = this.now();
     const live = await this.deps.accessTokens.findLive(
       await hashToken(accessToken),
-      now.toISOString()
+      now.toISOString(),
+      `${this.deps.issuer}/mcp`
     );
     if (!live.ok) return null;
     if (!live.value) return null;

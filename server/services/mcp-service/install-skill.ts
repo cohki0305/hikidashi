@@ -10,11 +10,18 @@ const CLAUDE_CODE_ONLY_STEP = "このスキルは大きいので Claude Code で
 
 function stepsFor(info: InstallInfo): string {
   const steps = [
-    `1. downloadUrl から zip を取得する（例: curl -fsSL -o /tmp/${info.name}.zip '${info.downloadUrl}'）。`,
-    `2. ~/.claude/skills/${info.name}/ に展開する（例: mkdir -p ~/.claude/skills/${info.name} && unzip -o /tmp/${info.name}.zip -d ~/.claude/skills/${info.name}）。zip の一番上にフォルダが 1 つだけあるときは、その中身を ~/.claude/skills/${info.name}/ の直下に置く。`,
-    `3. ~/.claude/skills/${info.name}/.hikidashi.json に marker を JSON で書く。`
-  ].join("");
-  return `${steps}\n${info.claudeCodeOnly ? CLAUDE_CODE_ONLY_STEP : CLAUDE_AI_STEP}`;
+    `downloadUrl から zip を取得する（例: curl -fsSL -o /tmp/${info.name}.zip '${info.downloadUrl}'）。`,
+    `~/.claude/skills/${info.name}/ に展開する（例: mkdir -p ~/.claude/skills/${info.name} && unzip -o /tmp/${info.name}.zip -d ~/.claude/skills/${info.name}）。zip の一番上にフォルダが 1 つだけあるときは、その中身を ~/.claude/skills/${info.name}/ の直下に置く。`
+  ];
+  if (info.hasSetup) {
+    steps.push(
+      `setup.sh があるので、~/.claude/skills/${info.name}/ で bash setup.sh を実行してセットアップする。`
+    );
+  }
+  steps.push(`~/.claude/skills/${info.name}/.hikidashi.json に marker を JSON で書く。`);
+
+  const numbered = steps.map((step, index) => `${index + 1}. ${step}`).join("");
+  return `${numbered}\n${info.claudeCodeOnly ? CLAUDE_CODE_ONLY_STEP : CLAUDE_AI_STEP}`;
 }
 
 /** チームのスキルを手元に入れるための、10 分だけ使えるダウンロード URL を返す。 */
@@ -34,6 +41,7 @@ export const installSkillTool: McpTool<InstallSkillInput> = {
       fingerprint: info.fingerprint,
       sizeBytes: info.sizeBytes,
       claudeCodeOnly: info.claudeCodeOnly,
+      hasSetup: info.hasSetup,
       downloadUrl: info.downloadUrl,
       expiresInSeconds: info.expiresInSeconds,
       marker: {

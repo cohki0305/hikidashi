@@ -1,7 +1,7 @@
 import { copyObject, presignPut, type R2S3Config } from "@/server/lib/r2/presign";
 import { conflict, invalid, notFound, ok, type Result, upstream } from "@/server/lib/result";
 import { r2RangeSource } from "@/server/lib/zip";
-import { type InspectedSkill, inspectSkillZip } from "@/server/lib/zip/inspect-skill";
+import { inspectSkillZip } from "@/server/lib/zip/inspect-skill";
 import type { SkillFileRepository } from "@/server/repositories/skill-file-repository";
 import type { SkillRepository } from "@/server/repositories/skill-repository";
 import type { SkillVersionRepository } from "@/server/repositories/skill-version-repository";
@@ -10,10 +10,12 @@ import type {
   UploadRepository,
   UploadRow
 } from "@/server/repositories/upload-repository";
-import type { FinishPublishResult, PublishTicket } from "@/shared/schemas/mcp";
+import {
+  type FinishPublishResult,
+  MAX_UPLOAD_BYTES,
+  type PublishTicket
+} from "@/shared/schemas/mcp";
 
-/** 1 版の zip の上限（200 MB）。 */
-export const MAX_UPLOAD_BYTES = 209_715_200;
 /** アップロード先の署名の有効期限（30 分）。 */
 const UPLOAD_TTL_SECONDS = 1800;
 /** 期限切れの受け皿を片付ける件数の上限。 */
@@ -43,10 +45,12 @@ export class PublishService {
   constructor(private readonly deps: PublishServiceDeps) {}
 
   /** 受け皿を作り、アップロード用の署名付き URL を返す。 */
-  async begin(email: string): Promise<Result<PublishTicket>> {
+  async begin(email: string, sizeBytes: number): Promise<Result<PublishTicket>> {
     const config = this.deps.s3;
     if (config === undefined) return invalid(MISSING_CONFIG_MESSAGE, { missingConfig: true });
 
+    if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_UPLOAD_BYTES)
+      return invalid("zip のサイズは 1 バイトから 200MB までです");
     const uploadId = crypto.randomUUID();
     const r2Key = `uploads/${uploadId}.zip`;
     const createdAt = (this.deps.now ?? (() => new Date()))().toISOString();
@@ -56,7 +60,7 @@ export class PublishService {
 
     let uploadUrl: string;
     try {
-      uploadUrl = await presignPut(config, r2Key, UPLOAD_TTL_SECONDS);
+      uploadUrl = await presignPut(config, r2Key, sizeBytes, UPLOAD_TTL_SECONDS);
     } catch {
       return upstream("アップロード用の URL を作れませんでした");
     }
@@ -96,7 +100,27 @@ export class PublishService {
     if (head.value === null) return invalid("zip がまだ届いていません");
     if (head.value > MAX_UPLOAD_BYTES) return invalid("zip が大きすぎます（200MB まで）");
 
-    const inspected = await this.inspect(upload);
+    const versionId = crypto.randomUUID();
+    const versionKey = `versions/${versionId}.zip`;
+    const copied = await copyObject(config, upload.r2Key, versionKey, this.deps.fetchImpl ?? fetch);
+    if (!copied.ok) return copied;
+    const result = await this.registerCopy(email, upload, versionId, versionKey, now(), note);
+    if (!result.ok || result.value.status === "unchanged") await this.deleteObject(versionKey);
+    return result;
+  }
+
+  private async registerCopy(
+    email: string,
+    upload: UploadRow,
+    versionId: string,
+    versionKey: string,
+    date: Date,
+    note?: string
+  ): Promise<Result<FinishPublishResult>> {
+    const source = await r2RangeSource(this.deps.bucket, versionKey);
+    if (!source.ok) return source;
+    if (source.value.size > MAX_UPLOAD_BYTES) return invalid("zip が大きすぎます（200MB まで）");
+    const inspected = await inspectSkillZip(source.value);
     if (!inspected.ok) return inspected;
     const skill = inspected.value;
 
@@ -112,17 +136,12 @@ export class PublishService {
     const latest = latestResult.value;
 
     if (latest !== null && latest.fingerprint === skill.fingerprint) {
-      return this.unchanged(uploadId, upload.r2Key, skill.name, latest.version);
+      return this.unchanged(upload.id, upload.r2Key, skill.name, latest.version);
     }
 
     const skillId = existing?.id ?? crypto.randomUUID();
     const version = (existing?.latestVersion ?? 0) + 1;
-    const versionId = crypto.randomUUID();
-    const versionKey = `versions/${skillId}/${version}-${versionId}.zip`;
-    const createdAt = now().toISOString();
-
-    const copied = await copyObject(config, upload.r2Key, versionKey, this.deps.fetchImpl ?? fetch);
-    if (!copied.ok) return copied;
+    const createdAt = date.toISOString();
 
     const statements = this.buildStatements({
       skillId,
@@ -141,7 +160,6 @@ export class PublishService {
     statements.push(this.deps.uploads.markUsedStatement(upload.id));
     const committed = await this.deps.uploads.commit(statements);
     if (!committed.ok) {
-      await this.deleteObject(versionKey);
       return committed.details?.unique === true ? conflict(CONFLICT_MESSAGE) : committed;
     }
 
@@ -196,12 +214,6 @@ export class PublishService {
       return upstream("zip を確かめられませんでした");
     }
   }
-  private async inspect(upload: UploadRow): Promise<Result<InspectedSkill>> {
-    const source = await r2RangeSource(this.deps.bucket, upload.r2Key);
-    if (!source.ok) return source;
-    return inspectSkillZip(source.value);
-  }
-
   private async deleteObject(key: string): Promise<void> {
     try {
       await this.deps.bucket.delete(key);
