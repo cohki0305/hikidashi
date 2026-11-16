@@ -58,10 +58,11 @@ describe("presignGet", () => {
 
 describe("presignPut", () => {
   it("既定で 1800 秒の署名付き URL を返す", async () => {
-    const url = new URL(await presignPut(CONFIG, "uploads/upload-1.zip"));
+    const url = new URL(await presignPut(CONFIG, "uploads/upload-1.zip", 100));
 
     expect(url.host).toBe("test-account.r2.cloudflarestorage.com");
     expect(decodeURIComponent(url.pathname)).toBe("/hikidashi-skills/uploads/upload-1.zip");
+    expect(url.searchParams.get("X-Amz-SignedHeaders")?.split(";")).toContain("content-length");
     expect(url.searchParams.get("X-Amz-Expires")).toBe("1800");
     expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
   });

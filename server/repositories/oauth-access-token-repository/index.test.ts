@@ -38,6 +38,7 @@ async function seedGrant(db: SkillDb, grants: OauthGrantRepository) {
     .run();
   const created = await grants.create({
     id: "grant-1",
+    resource: "https://example.test/mcp",
     email: "hanako@example.test",
     clientId: "client-1",
     refreshTokenHash: "r".repeat(64),
@@ -64,15 +65,20 @@ describe("OauthAccessTokenRepository", () => {
       })
     ).toEqual({ ok: true, value: undefined });
 
-    expect(await repository.findLive(TOKEN_HASH, NOW)).toEqual({
+    expect(await repository.findLive(TOKEN_HASH, NOW, "https://example.test/mcp")).toEqual({
       ok: true,
       value: { grantId: "grant-1", email: "hanako@example.test" }
     });
-    expect(await repository.findLive(TOKEN_HASH, "2026-10-20T02:00:00.000Z")).toEqual({
+    expect(
+      await repository.findLive(TOKEN_HASH, "2026-10-20T02:00:00.000Z", "https://example.test/mcp")
+    ).toEqual({
       ok: true,
       value: null
     });
-    expect(await repository.findLive("z".repeat(64), NOW)).toEqual({ ok: true, value: null });
+    expect(await repository.findLive("z".repeat(64), NOW, "https://example.test/mcp")).toEqual({
+      ok: true,
+      value: null
+    });
   });
 
   test("取り消した grant のトークンは引けない", async () => {
@@ -86,6 +92,9 @@ describe("OauthAccessTokenRepository", () => {
 
     await grants.revoke("grant-1", NOW);
 
-    expect(await repository.findLive(TOKEN_HASH, NOW)).toEqual({ ok: true, value: null });
+    expect(await repository.findLive(TOKEN_HASH, NOW, "https://example.test/mcp")).toEqual({
+      ok: true,
+      value: null
+    });
   });
 });

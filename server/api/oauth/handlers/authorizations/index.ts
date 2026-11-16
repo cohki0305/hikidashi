@@ -10,6 +10,8 @@ const UNUSABLE_MESSAGE =
 
 /** 検証して頼みを作り、許可の画面へ送る。 */
 export const index = factory.createHandlers(async (c) => {
+  if ((c.req.queries("resource") ?? []).length > 1)
+    return plainText(c, 400, "利用先は一つだけ指定してください");
   const query = c.req.query();
   const result = await c.get("oauth").startAuthorization({
     responseType: query.response_type,

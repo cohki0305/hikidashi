@@ -111,6 +111,32 @@ const dumps = async (db: SkillDb) =>
   ]);
 
 describe("OauthService", () => {
+  test("誤った利用先・検証値ではコードを消費せず、並行交換は一度だけ成功する", async () => {
+    const { service } = setup();
+    const { code, clientId } = await allowed(service);
+    const input = { code, clientId, redirectUri: REDIRECT, codeVerifier: VERIFIER };
+    const foreign = "https://other.example.test/mcp";
+    const start = must(
+      await service.startAuthorization({ clientId, redirectUri: REDIRECT, resource: foreign })
+    );
+    expect(start.kind === "rejected" && new URL(start.redirectTo).searchParams.get("error")).toBe(
+      "invalid_target"
+    );
+    expect(await service.exchangeCode({ ...input, resource: foreign })).toMatchObject({
+      message: "invalid_target"
+    });
+    expectInvalidGrant(await service.exchangeCode({ ...input, codeVerifier: "wrong" }));
+    const results = await Promise.all([service.exchangeCode(input), service.exchangeCode(input)]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    const issued = results.find((result) => result.ok);
+    if (!issued?.ok) throw new Error("トークンがありません");
+    const refresh = { clientId, refreshToken: issued.value.refreshToken };
+    expect(await service.refresh({ ...refresh, resource: foreign })).toMatchObject({
+      message: "invalid_target"
+    });
+    expect((await service.refresh({ ...refresh, resource: `${ISSUER}/mcp` })).ok).toBe(true);
+  });
+
   afterEach(() => {
     while (openDbs.length > 0) openDbs.pop()?.close();
   });

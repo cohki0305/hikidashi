@@ -128,7 +128,7 @@ describe("McpService", () => {
       kind: "error",
       content: MISSING_CONFIG_MESSAGE
     });
-    expect(await handlers.callTool("begin_publish", {})).toEqual({
+    expect(await handlers.callTool("begin_publish", { sizeBytes: 100 })).toEqual({
       kind: "error",
       content: MISSING_CONFIG_MESSAGE
     });

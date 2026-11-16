@@ -80,13 +80,15 @@ export async function presignGet(
 export async function presignPut(
   config: R2S3Config,
   key: string,
+  sizeBytes: number,
   expiresInSeconds = 1800
 ): Promise<string> {
   const url = objectUrl(config, key);
   url.searchParams.set("X-Amz-Expires", String(expiresInSeconds));
   const signed = await createClient(config).sign(url, {
     method: "PUT",
-    aws: { signQuery: true }
+    headers: { "Content-Length": String(sizeBytes) },
+    aws: { signQuery: true, allHeaders: true }
   });
   return signed.url;
 }

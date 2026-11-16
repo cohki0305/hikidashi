@@ -219,6 +219,9 @@ export class SkillService {
     if (config === undefined)
       return upstream("R2 の S3 の設定が足りません", { missingConfig: true });
 
+    const setupResult = await this.deps.files.findByVersionIdAndPath(version.id, "setup.sh");
+    if (!setupResult.ok) return setupResult;
+
     let downloadUrl: string;
     try {
       downloadUrl = await presignGet(config, version.r2Key);
@@ -232,6 +235,7 @@ export class SkillService {
       fingerprint: version.fingerprint,
       sizeBytes: version.sizeBytes,
       claudeCodeOnly: version.sizeBytes > this.claudeAiMaxBytes,
+      hasSetup: setupResult.value !== null,
       downloadUrl,
       expiresInSeconds: 600
     });

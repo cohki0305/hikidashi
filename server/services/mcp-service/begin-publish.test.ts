@@ -36,7 +36,7 @@ describe("begin_publish", () => {
         },
         finish: async () => notFound("使いません")
       }),
-      {}
+      { sizeBytes: 100 }
     );
 
     expect(result.ok).toBe(true);
@@ -51,7 +51,7 @@ describe("begin_publish", () => {
   });
 
   test("公開の口が無い環境では管理者向けの文言で断る", async () => {
-    expect(await beginPublishTool.call(context(), {})).toEqual({
+    expect(await beginPublishTool.call(context(), { sizeBytes: 100 })).toEqual({
       ok: false,
       kind: "upstream",
       message: MISSING_CONFIG_MESSAGE
@@ -64,7 +64,7 @@ describe("begin_publish", () => {
         begin: async () => upstream("R2 の S3 の設定が足りません", { missingConfig: true }),
         finish: async () => notFound("使いません")
       }),
-      {}
+      { sizeBytes: 100 }
     );
 
     expect(result).toEqual({ ok: false, kind: "upstream", message: MISSING_CONFIG_MESSAGE });

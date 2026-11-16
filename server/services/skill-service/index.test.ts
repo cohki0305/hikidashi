@@ -415,6 +415,7 @@ describe("SkillService.installInfo", () => {
       fingerprint: latest.fingerprint,
       sizeBytes: latest.sizeBytes,
       claudeCodeOnly: false,
+      hasSetup: false,
       expiresInSeconds: 600
     });
     const url = new URL(result.value.downloadUrl);
@@ -509,5 +510,19 @@ describe("SkillService.installInfo", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.claudeCodeOnly).toBe(true);
+  });
+
+  test("setup.sh がある版は hasSetup を返し、無ければ false", async () => {
+    const { testDb, fake, service } = setup();
+    await seedSkill(testDb.db, fake.bucket, {
+      name: "alpha",
+      title: "アルファ",
+      files: { ...TEXT_FILES, "setup.sh": "bun install\n" }
+    });
+
+    const withSetup = await service.installInfo("alpha");
+    expect(withSetup.ok).toBe(true);
+    if (!withSetup.ok) return;
+    expect(withSetup.value.hasSetup).toBe(true);
   });
 });

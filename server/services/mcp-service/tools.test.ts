@@ -24,7 +24,7 @@ describe("MCP_TOOLS", () => {
       "チームのスキルを手元に入れるための、10 分だけ使えるダウンロード URL を返します。返ってきた steps の手順に従ってください。手元に同じスキルがあるときは、入れ直してよいか利用者に確かめてから置き換えてください。"
     );
     expect(descriptions.begin_publish).toBe(
-      "Claude Code 専用です。スキルを公開するための、30 分だけ使えるアップロード先を作ります。返ってきた steps の手順で zip を送り、最後に finish_publish を呼んでください。"
+      "Claude Code 専用です。公開するスキルのフォルダを丸ごと zip にしてください。フォルダ内のファイルは .gitignore で無視されているものと .hikidashi.json を除いてすべて含め、SKILL.md は zip の直下に置いてください。できた zip を wc -c で測ったバイト数を sizeBytes に渡してください。スキルを公開するための、30 分だけ使えるアップロード先を作ります。返ってきた steps の手順で zip を送り、最後に finish_publish を呼んでください。"
     );
     expect(descriptions.finish_publish).toBe(
       "begin_publish で送った zip を検査して、新しい版として公開します。中身が最新版と同じなら版は増えず、変更なしと返します。公開できたら、名前と版を利用者に伝え、手元の .hikidashi.json を新しい版と指紋に書き換えてください。"
@@ -38,7 +38,7 @@ describe("MCP_TOOLS", () => {
     expect(byName.get("install_skill")?.input.safeParse({ name: "invoice-entry" }).success).toBe(
       true
     );
-    expect(byName.get("begin_publish")?.input.safeParse({}).success).toBe(true);
+    expect(byName.get("begin_publish")?.input.safeParse({ sizeBytes: 100 }).success).toBe(true);
     expect(byName.get("finish_publish")?.input.safeParse({ uploadId: "upload-1" }).success).toBe(
       true
     );

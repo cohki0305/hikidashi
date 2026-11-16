@@ -28,7 +28,8 @@ export class OauthAccessTokenRepository {
   /** 期限内で、取り消されていない grant のトークンだけ返す。 */
   async findLive(
     tokenHash: string,
-    now: string
+    now: string,
+    resource: string
   ): Promise<Result<{ grantId: string; email: string } | null>> {
     try {
       const row = await this.db
@@ -37,6 +38,7 @@ export class OauthAccessTokenRepository {
         .innerJoin(oauthGrants, eq(oauthAccessTokens.grantId, oauthGrants.id))
         .where(
           and(
+            eq(oauthGrants.resource, resource),
             eq(oauthAccessTokens.tokenHash, tokenHash),
             gt(oauthAccessTokens.expiresAt, now),
             isNull(oauthGrants.revokedAt),
